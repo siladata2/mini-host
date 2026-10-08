@@ -3,28 +3,81 @@ import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { execFile } from "child_process";
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-const HEROKU_API_KEY = process.env.HEROKU_API_KEY;
-const HEROKU_TEAM = process.env.HEROKU_TEAM;
+
+const HEROKU_API_KEY = process.env.HEROKU_API_KEY?.trim();
+const HEROKU_TEAM = process.env.HEROKU_TEAM?.trim();
 
 const execFileAsync = promisify(execFile);
-
-app.use(express.json({ limit: "2mb" }));
-app.use(express.static("public"));
-
 const deployments = new Map();
+
+app.disable("x-powered-by");
+app.use(express.json({ limit: "2mb" }));
+
+// index.html iko kwenye root ya repository
+app.get("/", (req, res) => {
+    const indexPath = path.join(__dirname, "index.html");
+
+    if (!fs.existsSync(indexPath)) {
+        console.error("[UI] ERROR: index.html haipo kwenye root.");
+
+        return res.status(404).send(`
+            <h1>Mini Heroku UI haijapatikana</h1>
+            <p>Hakikisha index.html ipo pamoja na server.js kwenye root.</p>
+        `);
+    }
+
+    res.sendFile(indexPath);
+});
+
+// Static files kama CSS, JS na picha
+app.use(express.static(__dirname, {
+    index: false,
+    dotfiles: "ignore"
+}));
+
+// Health check
+app.get("/api/health", (req, res) => {
+    res.json({
+        ok: true,
+        service: "Mini Heroku",
+        time: new Date().toISOString()
+    });
+});
+
+// Usalama: haionyeshi API key yenyewe
+app.get("/api/config-status", (req, res) => {
+    res.json({
+        apiKeyConfigured: Boolean(HEROKU_API_KEY),
+        teamConfigured: Boolean(HEROKU_TEAM),
+        portConfigured: Boolean(process.env.PORT),
+        uiFound: fs.existsSync(path.join(__dirname, "index.html"))
+    });
+});
+
+// Logs
+function log(message) {
+    console.log(
+        `[Mini Heroku ${new Date().toISOString()}] ${message}`
+    );
+}
 
 function logDeployment(id, message) {
     const deployment = deployments.get(id);
     if (!deployment) return;
 
-    const line = `[${new Date().toISOString()}] ${message}`;
+    const line =
+        `[${new Date().toISOString()}] ${message}`;
 
     deployment.logs.push(line);
 
@@ -32,19 +85,35 @@ function logDeployment(id, message) {
         deployment.logs.shift();
     }
 
-    console.log(line);
+    log(`[Deployment ${id}] ${message}`);
 }
 
-function updateDeployment(id, data) {
-    const current = deployments.get(id);
-    if (!current) return;
+function updateDeployment(id, updates) {
+    const deployment = deployments.get(id);
 
-    Object.assign(current, data);
+    if (deployment) {
+        Object.assign(deployment, updates);
+    }
 }
 
+function requireHerokuConfig() {
+    if (!HEROKU_API_KEY) {
+        throw new Error(
+            "HEROKU_API_KEY haijawekwa kwenye environment variables."
+        );
+    }
+
+    if (!HEROKU_TEAM) {
+        throw new Error(
+            "HEROKU_TEAM haijawekwa kwenye environment variables."
+        );
+    }
+}
+
+// Heroku API helper
 async function herokuRequest(endpoint, options = {}) {
     if (!HEROKU_API_KEY) {
-        throw new Error("HEROKU_API_KEY haijawekwa kwenye .env");
+        throw new Error("HEROKU_API_KEY haijawekwa.");
     }
 
     const response = await fetch(
@@ -62,27 +131,73 @@ async function herokuRequest(endpoint, options = {}) {
         }
     );
 
-    const text = await response.text();
+    const responseText = await response.text();
 
     let data = {};
 
     try {
-        data = text ? JSON.parse(text) : {};
+        data = responseText ? JSON.parse(responseText) : {};
     } catch {
-        data = { message: text };
+        data = { message: responseText };
     }
 
     if (!response.ok) {
-        throw new Error(
+        const error = new Error(
             data.message ||
             data.error ||
-            `Heroku API error: ${response.status}`
+            `Heroku API error ${response.status}`
         );
+
+        error.status = response.status;
+
+        throw error;
     }
 
     return data;
 }
 
+// Test API key na Team access wakati server inaanza
+async function checkHerokuConnection() {
+    if (!HEROKU_API_KEY) {
+        log("❌ HEROKU_API_KEY haipo.");
+        log("Weka API key kwenye Heroku Config Vars.");
+        return;
+    }
+
+    log("🔑 HEROKU_API_KEY imepatikana.");
+    log("🔒 API key imefichwa; haitachapishwa kwenye terminal.");
+
+    try {
+        const account = await herokuRequest("/account");
+
+        log("✅ Heroku API key imekubaliwa.");
+        log(`✅ Heroku account authenticated: ${account.email || "OK"}`);
+
+        if (HEROKU_TEAM) {
+            try {
+                const team = await herokuRequest(
+                    `/teams/${encodeURIComponent(HEROKU_TEAM)}`
+                );
+
+                log(
+                    `✅ Heroku Team imeunganishwa: ${team.name || HEROKU_TEAM}`
+                );
+            } catch (error) {
+                log(`⚠️ Team check imeshindwa: ${error.message}`);
+            }
+        } else {
+            log("⚠️ HEROKU_TEAM haijawekwa.");
+        }
+    } catch (error) {
+        if (error.status === 401 || error.status === 403) {
+            log("❌ Heroku API key imekataliwa au haina ruhusa.");
+        } else {
+            log(`❌ Heroku connection error: ${error.message}`);
+        }
+    }
+}
+
+// GitHub repository URL
 function parseGithubUrl(input) {
     let url;
 
@@ -92,40 +207,23 @@ function parseGithubUrl(input) {
         throw new Error("Weka GitHub repository URL sahihi.");
     }
 
-    if (
-        url.hostname !== "github.com" ||
-        url.pathname.split("/").filter(Boolean).length < 2
-    ) {
-        throw new Error(
-            "URL lazima iwe ya repository ya GitHub, mfano https://github.com/user/repo"
-        );
+    if (url.hostname !== "github.com") {
+        throw new Error("URL lazima iwe ya github.com.");
     }
 
     const parts = url.pathname.split("/").filter(Boolean);
-    const owner = parts[0];
-    const repo = parts[1].replace(/\.git$/, "");
-    const branch = parts.length >= 4 && parts[2] === "tree"
-        ? parts.slice(3).join("/")
-        : null;
 
-    return { owner, repo, branch };
-}
-
-async function githubRequest(url) {
-    const response = await fetch(url, {
-        headers: {
-            Accept: "application/vnd.github+json",
-            "User-Agent": "Mini-Heroku"
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error(
-            `GitHub request imeshindwa (${response.status}). Hakikisha repository ipo na ni public.`
-        );
+    if (parts.length < 2) {
+        throw new Error("GitHub URL lazima iwe /owner/repository.");
     }
 
-    return response.json();
+    return {
+        owner: parts[0],
+        repo: parts[1].replace(/\.git$/, ""),
+        branch: parts[2] === "tree"
+            ? parts.slice(3).join("/")
+            : null
+    };
 }
 
 async function getGithubFile(owner, repo, filename, branch) {
@@ -135,9 +233,8 @@ async function getGithubFile(owner, repo, filename, branch) {
 
     for (const ref of branches) {
         const url =
-            `https://raw.githubusercontent.com/` +
-            `${owner}/${repo}/${encodeURIComponent(ref)}/` +
-            filename;
+            `https://raw.githubusercontent.com/${owner}/${repo}/` +
+            `${encodeURIComponent(ref)}/${filename}`;
 
         try {
             const response = await fetch(url);
@@ -146,42 +243,11 @@ async function getGithubFile(owner, repo, filename, branch) {
                 return await response.text();
             }
         } catch {
-            // Jaribu branch inayofuata.
+            // Jaribu branch nyingine.
         }
     }
 
     return null;
-}
-
-function parseEnv(text) {
-    if (!text) return {};
-
-    const result = {};
-
-    for (const rawLine of text.split(/\r?\n/)) {
-        const line = rawLine.trim();
-
-        if (!line || line.startsWith("#")) continue;
-
-        const match = line.match(
-            /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/
-        );
-
-        if (!match) continue;
-
-        let value = match[2].trim();
-
-        if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-        ) {
-            value = value.slice(1, -1);
-        }
-
-        result[match[1]] = value;
-    }
-
-    return result;
 }
 
 function parseAppJson(text) {
@@ -190,53 +256,53 @@ function parseAppJson(text) {
     try {
         return JSON.parse(text);
     } catch {
-        throw new Error(
-            "app.json ina makosa ya JSON. Rekebisha faili hilo kwenye GitHub."
-        );
+        throw new Error("app.json ina makosa ya JSON.");
     }
 }
 
-function detectEnvVars(appJson, packageJson, requirements) {
-    const env = new Set();
+function detectEnvVars(appJson, packageText, requirementsText) {
+    const keys = new Set();
 
     if (appJson.env && typeof appJson.env === "object") {
-        for (const key of Object.keys(appJson.env)) {
-            env.add(key);
-        }
+        Object.keys(appJson.env).forEach((key) => keys.add(key));
     }
 
-    const packageText = packageJson || "";
-    const requirementsText = requirements || "";
-
-    const combined = `${packageText}\n${requirementsText}`;
+    const combined =
+        `${packageText || ""}\n${requirementsText || ""}`;
 
     for (const match of combined.matchAll(
         /process\.env\.([A-Za-z_][A-Za-z0-9_]*)/g
     )) {
-        env.add(match[1]);
+        keys.add(match[1]);
     }
 
     for (const match of combined.matchAll(
         /os\.environ(?:\.get)?\s*\(\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/g
     )) {
-        env.add(match[1]);
+        keys.add(match[1]);
     }
 
-    return [...env].sort();
+    return [...keys].sort();
 }
 
+// Analyze GitHub repository
 async function analyzeRepository(repositoryUrl) {
     const { owner, repo, branch } = parseGithubUrl(repositoryUrl);
 
-    const [appJsonText, packageJsonText, procfile, requirements] =
-        await Promise.all([
-            getGithubFile(owner, repo, "app.json", branch),
-            getGithubFile(owner, repo, "package.json", branch),
-            getGithubFile(owner, repo, "Procfile", branch),
-            getGithubFile(owner, repo, "requirements.txt", branch)
-        ]);
+    const [
+        appJsonText,
+        packageJsonText,
+        procfile,
+        requirements
+    ] = await Promise.all([
+        getGithubFile(owner, repo, "app.json", branch),
+        getGithubFile(owner, repo, "package.json", branch),
+        getGithubFile(owner, repo, "Procfile", branch),
+        getGithubFile(owner, repo, "requirements.txt", branch)
+    ]);
 
     const appJson = parseAppJson(appJsonText);
+
     let packageJson = {};
 
     if (packageJsonText) {
@@ -247,28 +313,20 @@ async function analyzeRepository(repositoryUrl) {
         }
     }
 
-    const detectedEnv = detectEnvVars(
+    const envVars = detectEnvVars(
         appJson,
         packageJsonText,
         requirements
-    );
-
-    const declaredEnv = appJson.env || {};
-    const envVars = detectedEnv.map((key) => {
-        const definition = declaredEnv[key] || {};
-
-        return {
-            key,
-            description: definition.description || "",
-            required: definition.required !== false,
-            value: ""
-        };
-    });
+    ).map((key) => ({
+        key,
+        description: appJson.env?.[key]?.description || "",
+        required: appJson.env?.[key]?.required !== false
+    }));
 
     const buildpacks = Array.isArray(appJson.buildpacks)
-        ? appJson.buildpacks
-            .map((item) => typeof item === "string" ? item : item.url)
-            .filter(Boolean)
+        ? appJson.buildpacks.map((item) =>
+            typeof item === "string" ? item : item.url
+        ).filter(Boolean)
         : [];
 
     return {
@@ -304,26 +362,28 @@ function normalizeBuildpacks(buildpacks, analysis) {
         }
     }
 
-    return result.map((buildpack) => {
-        const aliases = {
-            "heroku/nodejs":
-                "https://github.com/heroku/heroku-buildpack-nodejs",
-            "nodejs":
-                "https://github.com/heroku/heroku-buildpack-nodejs",
-            "heroku/python":
-                "https://github.com/heroku/heroku-buildpack-python",
-            "python":
-                "https://github.com/heroku/heroku-buildpack-python",
-            "heroku/java":
-                "https://github.com/heroku/heroku-buildpack-java",
-            "heroku/ruby":
-                "https://github.com/heroku/heroku-buildpack-ruby"
-        };
+    const aliases = {
+        "heroku/nodejs":
+            "https://github.com/heroku/heroku-buildpack-nodejs",
+        "nodejs":
+            "https://github.com/heroku/heroku-buildpack-nodejs",
+        "heroku/python":
+            "https://github.com/heroku/heroku-buildpack-python",
+        "python":
+            "https://github.com/heroku/heroku-buildpack-python",
+        "heroku/java":
+            "https://github.com/heroku/heroku-buildpack-java",
+        "heroku/ruby":
+            "https://github.com/heroku/heroku-buildpack-ruby"
+    };
 
-        const normalized = aliases[buildpack.toLowerCase()] || buildpack;
+    return result.map((item) => {
+        const normalized = aliases[item.toLowerCase()] || item;
 
-        if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(normalized)) {
-            throw new Error(`Buildpack URL haitambuliki: ${buildpack}`);
+        if (
+            !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(normalized)
+        ) {
+            throw new Error(`Buildpack URL haitambuliki: ${item}`);
         }
 
         return normalized;
@@ -331,23 +391,20 @@ function normalizeBuildpacks(buildpacks, analysis) {
 }
 
 async function createHerokuApp(name) {
-    if (!HEROKU_TEAM) {
-        throw new Error("HEROKU_TEAM haijawekwa kwenye .env");
-    }
+    requireHerokuConfig();
 
     return herokuRequest("/teams/apps", {
         method: "POST",
         body: JSON.stringify({
             name,
             team: HEROKU_TEAM,
-            region: "us",
-            stack: "heroku-24"
+            region: "us"
         })
     });
 }
 
 async function setConfigVars(appName, vars) {
-    if (!vars || !Object.keys(vars).length) return;
+    if (!Object.keys(vars).length) return;
 
     await herokuRequest(`/apps/${appName}/config-vars`, {
         method: "PATCH",
@@ -357,13 +414,16 @@ async function setConfigVars(appName, vars) {
 
 async function configureBuildpacks(appName, buildpacks) {
     for (let index = 0; index < buildpacks.length; index++) {
-        await herokuRequest(`/apps/${appName}/buildpack-installations`, {
-            method: "POST",
-            body: JSON.stringify({
-                buildpack: buildpacks[index],
-                ordinal: index + 1
-            })
-        });
+        await herokuRequest(
+            `/apps/${appName}/buildpack-installations`,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    buildpack: buildpacks[index],
+                    ordinal: index + 1
+                })
+            }
+        );
     }
 }
 
@@ -374,62 +434,61 @@ async function createSource(appName) {
 }
 
 async function uploadSource(sourceUrl, archivePath) {
-    const fileBuffer = fs.readFileSync(archivePath);
+    const buffer = fs.readFileSync(archivePath);
 
+    // Usiongeze Content-Type kwenye signed source URL.
     const response = await fetch(sourceUrl, {
         method: "PUT",
-        body: fileBuffer
+        body: buffer
     });
 
     if (!response.ok) {
-        const text = await response.text();
-
         throw new Error(
-            `Source upload imeshindwa (${response.status}): ${text}`
+            `Source upload imeshindwa: HTTP ${response.status}`
         );
     }
 }
 
 async function prepareGithubSource(owner, repo, branch, workDir) {
-    const archivePath = path.join(workDir, "source.tar.gz");
+    const originalArchive = path.join(workDir, "source.tar.gz");
+    const uploadArchive = path.join(workDir, "upload.tar.gz");
+    const extractDir = path.join(workDir, "extract");
 
-    const branchesToTry = branch
-        ? [branch]
-        : ["main", "master"];
+    const branches = branch ? [branch] : ["main", "master"];
 
     let downloaded = false;
     let selectedBranch = null;
 
-    for (const currentBranch of branchesToTry) {
+    for (const ref of branches) {
         const url =
             `https://codeload.github.com/${owner}/${repo}/tar.gz/refs/heads/` +
-            encodeURIComponent(currentBranch);
+            encodeURIComponent(ref);
 
         const response = await fetch(url);
 
         if (response.ok) {
-            const buffer = Buffer.from(await response.arrayBuffer());
-            fs.writeFileSync(archivePath, buffer);
+            fs.writeFileSync(
+                originalArchive,
+                Buffer.from(await response.arrayBuffer())
+            );
+
             downloaded = true;
-            selectedBranch = currentBranch;
+            selectedBranch = ref;
             break;
         }
     }
 
     if (!downloaded) {
         throw new Error(
-            "Imeshindwa kupakua source kutoka GitHub. Hakikisha repository ni public na branch ni sahihi."
+            "Imeshindwa kupakua GitHub source. Hakikisha repository ni public."
         );
     }
-
-    const extractDir = path.join(workDir, "extract");
-    const outputPath = path.join(workDir, "upload.tar.gz");
 
     fs.mkdirSync(extractDir, { recursive: true });
 
     await execFileAsync("tar", [
         "-xzf",
-        archivePath,
+        originalArchive,
         "-C",
         extractDir,
         "--strip-components=1"
@@ -437,44 +496,41 @@ async function prepareGithubSource(owner, repo, branch, workDir) {
 
     await execFileAsync("tar", [
         "-czf",
-        outputPath,
+        uploadArchive,
         "-C",
         extractDir,
         "."
     ]);
 
     return {
-        archivePath: outputPath,
+        archivePath: uploadArchive,
         branch: selectedBranch
     };
 }
 
-async function createBuild(appName, sourceBlob) {
+async function createBuild(appName, sourceBlobUrl) {
     return herokuRequest(`/apps/${appName}/builds`, {
         method: "POST",
         body: JSON.stringify({
             source_blob: {
-                url: sourceBlob,
+                url: sourceBlobUrl,
                 version: "mini-heroku"
             }
         })
     });
 }
 
-async function getBuild(appName, buildId) {
-    return herokuRequest(`/apps/${appName}/builds/${buildId}`);
-}
+async function waitForBuild(appName, buildId, id) {
+    const deadline = Date.now() + 15 * 60 * 1000;
 
-async function waitForBuild(appName, buildId, deploymentId) {
-    const maxWait = 15 * 60 * 1000;
-    const started = Date.now();
-
-    while (Date.now() - started < maxWait) {
-        const build = await getBuild(appName, buildId);
+    while (Date.now() < deadline) {
+        const build = await herokuRequest(
+            `/apps/${appName}/builds/${buildId}`
+        );
 
         if (build.status === "succeeded") {
-            logDeployment(deploymentId, "Build succeeded.");
-            return build;
+            logDeployment(id, "Build succeeded.");
+            return;
         }
 
         if (build.status === "failed") {
@@ -482,22 +538,20 @@ async function waitForBuild(appName, buildId, deploymentId) {
         }
 
         logDeployment(
-            deploymentId,
+            id,
             `Build status: ${build.status || "pending"}`
         );
 
         await new Promise((resolve) => setTimeout(resolve, 5000));
     }
 
-    throw new Error("Build imechukua muda mrefu kupita kiasi.");
+    throw new Error("Build imezidi muda wa kusubiri.");
 }
 
 function buildFormation(analysis) {
-    const formation = analysis.formation || {};
-    const processes = analysis.processes || {};
     const updates = [];
 
-    for (const [type, config] of Object.entries(formation)) {
+    for (const [type, config] of Object.entries(analysis.formation || {})) {
         if (!config || typeof config !== "object") continue;
 
         updates.push({
@@ -505,47 +559,31 @@ function buildFormation(analysis) {
             quantity: Number.isInteger(config.quantity)
                 ? config.quantity
                 : 1,
-
-            // Mini Heroku hutumia Basic ili kuepuka eco dynos
-            // ambazo haziruhusiwi kwenye Heroku Teams.
             size: "basic"
         });
     }
 
     if (!updates.length) {
-        const processTypes = Object.keys(processes);
+        const processes = Object.keys(analysis.processes || {});
+        const type = processes.includes("web")
+            ? "web"
+            : processes[0] || "web";
 
-        if (processTypes.includes("web")) {
-            updates.push({
-                type: "web",
-                quantity: 1,
-                size: "basic"
-            });
-        } else if (processTypes.length) {
-            updates.push({
-                type: processTypes[0],
-                quantity: 1,
-                size: "basic"
-            });
-        } else {
-            updates.push({
-                type: "web",
-                quantity: 1,
-                size: "basic"
-            });
-        }
+        updates.push({
+            type,
+            quantity: 1,
+            size: "basic"
+        });
     }
 
     return updates;
 }
 
-async function applyFormation(appName, analysis, deploymentId) {
-    const updates = buildFormation(analysis);
-
-    for (const item of updates) {
+async function applyFormation(appName, analysis, id) {
+    for (const item of buildFormation(analysis)) {
         logDeployment(
-            deploymentId,
-            `Configuring ${item.type} dyno: ${item.size} x ${item.quantity}`
+            id,
+            `Setting ${item.type} dyno to Basic x ${item.quantity}`
         );
 
         await herokuRequest(
@@ -566,84 +604,70 @@ async function removeApp(appName) {
         await herokuRequest(`/apps/${appName}`, {
             method: "DELETE"
         });
+
+        log(`Cleaned up failed app: ${appName}`);
     } catch (error) {
-        console.error("App cleanup failed:", error.message);
+        log(`Cleanup warning: ${error.message}`);
     }
 }
 
 function makeAppName(base) {
-    const cleaned = String(base || "mini-app")
+    const safe = String(base || "mini-app")
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "-")
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "")
-        .slice(0, 25) || "mini-app";
+        .slice(0, 24) || "mini-app";
 
-    const suffix = Math.random().toString(36).slice(2, 7);
-
-    return `${cleaned}-${suffix}`.slice(0, 30);
+    return `${safe}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Deployment pipeline
 async function runDeployment(id, input) {
     let appName = null;
-    let success = false;
 
     try {
-        updateDeployment(id, {
-            status: "analyzing",
-            updatedAt: new Date().toISOString()
-        });
-
+        updateDeployment(id, { status: "analyzing" });
         logDeployment(id, "Analyzing GitHub repository...");
 
         const analysis = await analyzeRepository(input.repositoryUrl);
+        const { owner, repo, branch } = parseGithubUrl(input.repositoryUrl);
 
-        const { owner, repo, branch } = parseGithubUrl(
-            input.repositoryUrl
-        );
-
-        const appEnv = {};
+        const configVars = {};
 
         for (const variable of analysis.envVars) {
-            const supplied = input.envVars?.[variable.key];
+            const value = input.envVars?.[variable.key];
 
             if (
                 variable.required &&
-                !supplied &&
-                !Object.prototype.hasOwnProperty.call(
-                    input.envVars || {},
-                    variable.key
-                )
+                (value === undefined || value === "")
             ) {
                 throw new Error(
                     `Environment variable inahitajika: ${variable.key}`
                 );
             }
 
-            if (supplied !== undefined && supplied !== "") {
-                appEnv[variable.key] = supplied;
+            if (value !== undefined && value !== "") {
+                configVars[variable.key] = value;
             }
         }
 
         appName = makeAppName(analysis.appName);
 
-        logDeployment(id, `Creating Heroku Team app: ${appName}`);
+        logDeployment(id, `Creating Team app: ${appName}`);
 
-        const createdApp = await createHerokuApp(appName);
-        appName = createdApp.name;
+        const created = await createHerokuApp(appName);
+        appName = created.name;
 
         updateDeployment(id, {
             appName,
-            appId: createdApp.id,
-            status: "configuring",
-            updatedAt: new Date().toISOString()
+            appId: created.id,
+            status: "configuring"
         });
 
-        logDeployment(id, "Heroku app created.");
-
-        if (Object.keys(appEnv).length) {
+        if (Object.keys(configVars).length) {
             logDeployment(id, "Setting environment variables...");
-            await setConfigVars(appName, appEnv);
+            await setConfigVars(appName, configVars);
         }
 
         const buildpacks = normalizeBuildpacks(
@@ -661,23 +685,14 @@ async function runDeployment(id, input) {
         );
 
         try {
-            updateDeployment(id, {
-                status: "uploading",
-                updatedAt: new Date().toISOString()
-            });
-
-            logDeployment(id, "Downloading and preparing GitHub source...");
+            updateDeployment(id, { status: "uploading" });
+            logDeployment(id, "Preparing GitHub source...");
 
             const prepared = await prepareGithubSource(
                 owner,
                 repo,
                 branch,
                 workDir
-            );
-
-            logDeployment(
-                id,
-                `Uploading source archive from branch ${prepared.branch}...`
             );
 
             const source = await createSource(appName);
@@ -687,13 +702,9 @@ async function runDeployment(id, input) {
                 prepared.archivePath
             );
 
-            logDeployment(id, "Source uploaded successfully.");
+            logDeployment(id, "Source uploaded.");
 
-            updateDeployment(id, {
-                status: "building",
-                updatedAt: new Date().toISOString()
-            });
-
+            updateDeployment(id, { status: "building" });
             logDeployment(id, "Starting Heroku build...");
 
             const build = await createBuild(
@@ -709,27 +720,20 @@ async function runDeployment(id, input) {
             });
         }
 
-        updateDeployment(id, {
-            status: "releasing",
-            updatedAt: new Date().toISOString()
-        });
-
-        logDeployment(id, "Configuring dyno formation...");
+        updateDeployment(id, { status: "releasing" });
 
         await applyFormation(appName, analysis, id);
 
-        const appInfo = await herokuRequest(`/apps/${appName}`);
-
-        success = true;
+        const info = await herokuRequest(`/apps/${appName}`);
 
         updateDeployment(id, {
             status: "succeeded",
-            appName,
-            appUrl: appInfo.web_url || `https://${appName}.herokuapp.com`,
+            appUrl: info.web_url ||
+                `https://${appName}.herokuapp.com`,
             updatedAt: new Date().toISOString()
         });
 
-        logDeployment(id, "DEPLOYMENT SUCCEEDED.");
+        logDeployment(id, "✅ DEPLOYMENT SUCCEEDED.");
     } catch (error) {
         updateDeployment(id, {
             status: "failed",
@@ -737,24 +741,14 @@ async function runDeployment(id, input) {
             updatedAt: new Date().toISOString()
         });
 
-        logDeployment(id, `DEPLOYMENT FAILED: ${error.message}`);
+        logDeployment(id, `❌ DEPLOYMENT FAILED: ${error.message}`);
 
-        if (appName && !success) {
+        if (appName) {
             logDeployment(id, `Cleaning up failed app: ${appName}`);
             await removeApp(appName);
-            logDeployment(id, "Cleanup completed.");
         }
     }
 }
-
-// Health check
-app.get("/api/health", (req, res) => {
-    res.json({
-        ok: true,
-        service: "Mini Heroku",
-        time: new Date().toISOString()
-    });
-});
 
 // Analyze repository
 app.post("/api/repository/analyze", async (req, res) => {
@@ -774,15 +768,15 @@ app.post("/api/repository/analyze", async (req, res) => {
             analysis
         });
     } catch (error) {
-        res.status(400).json({
-            error: error.message
-        });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Start deployment
 app.post("/api/deploy", async (req, res) => {
     try {
+        requireHerokuConfig();
+
         const { repositoryUrl, envVars = {} } = req.body || {};
 
         if (!repositoryUrl) {
@@ -812,8 +806,7 @@ app.post("/api/deploy", async (req, res) => {
             appName: null,
             appUrl: null,
             logs: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            createdAt: new Date().toISOString()
         });
 
         res.status(202).json({
@@ -829,92 +822,77 @@ app.post("/api/deploy", async (req, res) => {
             logDeployment(id, `Unexpected error: ${error.message}`);
         });
     } catch (error) {
-        res.status(500).json({
-            error: error.message
-        });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Deployment status
 app.get("/api/deploy/:id", (req, res) => {
-    const deployment = deployments.get(req.params.id);
+    const item = deployments.get(req.params.id);
 
-    if (!deployment) {
+    if (!item) {
         return res.status(404).json({
             error: "Deployment haijapatikana."
         });
     }
 
-    res.json(deployment);
+    res.json(item);
 });
 
 // Deployment logs
 app.get("/api/deploy/:id/logs", (req, res) => {
-    const deployment = deployments.get(req.params.id);
+    const item = deployments.get(req.params.id);
 
-    if (!deployment) {
+    if (!item) {
         return res.status(404).json({
             error: "Deployment haijapatikana."
         });
     }
 
     res.json({
-        logs: deployment.logs,
-        status: deployment.status
+        logs: item.logs,
+        status: item.status
     });
 });
 
-// List apps belonging to the configured Team
+// Apps za Team
 app.get("/api/apps", async (req, res) => {
     try {
-        if (!HEROKU_TEAM) {
-            throw new Error("HEROKU_TEAM haijawekwa kwenye .env");
-        }
+        requireHerokuConfig();
 
         const apps = await herokuRequest(
             `/teams/${encodeURIComponent(HEROKU_TEAM)}/apps`
         );
 
-        res.json({
-            ok: true,
-            apps
-        });
+        res.json({ ok: true, apps });
     } catch (error) {
-        res.status(400).json({
-            error: error.message
-        });
+        res.status(400).json({ error: error.message });
     }
 });
 
-// Restart an app
+// Restart app
 app.post("/api/apps/:name/restart", async (req, res) => {
     try {
         await herokuRequest(
             `/apps/${encodeURIComponent(req.params.name)}/dynos`,
-            {
-                method: "DELETE"
-            }
+            { method: "DELETE" }
         );
 
         res.json({
             ok: true,
-            message: "App restart imeombwa."
+            message: "Restart imeombwa."
         });
     } catch (error) {
-        res.status(400).json({
-            error: error.message
-        });
+        res.status(400).json({ error: error.message });
     }
 });
 
-// Delete an app
+// Delete app
 app.delete("/api/apps/:name", async (req, res) => {
     try {
         await herokuRequest(
             `/apps/${encodeURIComponent(req.params.name)}`,
-            {
-                method: "DELETE"
-            }
+            { method: "DELETE" }
         );
 
         res.json({
@@ -922,12 +900,37 @@ app.delete("/api/apps/:name", async (req, res) => {
             message: "App imefutwa."
         });
     } catch (error) {
-        res.status(400).json({
-            error: error.message
-        });
+        res.status(400).json({ error: error.message });
     }
 });
 
+// Error handler
+app.use((err, req, res, next) => {
+    log(`Express error: ${err.message}`);
+
+    if (res.headersSent) {
+        return next(err);
+    }
+
+    res.status(500).json({
+        error: "Server error",
+        message: err.message
+    });
+});
+
+// Start server
 app.listen(PORT, () => {
-    console.log(`Mini Heroku running on port ${PORT}`);
-}); 
+    log("====================================");
+    log("🚀 MINI HEROKU SERVER STARTED");
+    log(`🌐 Port: ${PORT}`);
+    log(`📄 index.html found: ${
+        fs.existsSync(path.join(__dirname, "index.html"))
+    }`);
+    log(`🔑 API key configured: ${Boolean(HEROKU_API_KEY)}`);
+    log(`👥 Team configured: ${Boolean(HEROKU_TEAM)}`);
+    log("====================================");
+
+    checkHerokuConnection().catch((error) => {
+        log(`❌ Heroku startup check failed: ${error.message}`);
+    });
+});
