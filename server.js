@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express from "express";
-import multer from "multer";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -17,43 +16,39 @@ import {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const upload = multer({
-    dest: "uploads/",
-    limits: {
-        fileSize: 50 * 1024 * 1024
-    }
-});
-
-app.use(express.json());
-app.use(express.static("."));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.static(process.cwd()));
 
 
-// ========================================
-// HOME
-// ========================================
+/* =========================
+   HOME
+========================= */
 
 app.get("/", (req, res) => {
-    res.sendFile(path.join(process.cwd(), "index.html"));
+    res.sendFile(
+        path.join(process.cwd(), "index.html")
+    );
 });
 
 
-// ========================================
-// HEALTH
-// ========================================
+/* =========================
+   HEALTH
+========================= */
 
 app.get("/api/health", (req, res) => {
-
     res.json({
         success: true,
-        heroku: Boolean(process.env.HEROKU_API_KEY)
+        heroku: Boolean(
+            process.env.HEROKU_API_KEY
+        ),
+        team: process.env.HEROKU_TEAM || null
     });
-
 });
 
 
-// ========================================
-// GET APPS
-// ========================================
+/* =========================
+   GET APPS
+========================= */
 
 app.get("/api/apps", async (req, res) => {
 
@@ -63,13 +58,12 @@ app.get("/api/apps", async (req, res) => {
 
         res.json({
             success: true,
-
-            apps: apps.map(item => ({
-                id: item.id,
-                name: item.name,
-                url: item.web_url,
-                created: item.created_at,
-                updated: item.updated_at
+            apps: apps.map(app => ({
+                id: app.id,
+                name: app.name,
+                url: app.web_url,
+                created: app.created_at,
+                updated: app.updated_at
             }))
         });
 
@@ -85,9 +79,9 @@ app.get("/api/apps", async (req, res) => {
 });
 
 
-// ========================================
-// GET ONE APP
-// ========================================
+/* =========================
+   GET ONE APP
+========================= */
 
 app.get("/api/apps/:name", async (req, res) => {
 
@@ -113,9 +107,9 @@ app.get("/api/apps/:name", async (req, res) => {
 });
 
 
-// ========================================
-// CREATE APP
-// ========================================
+/* =========================
+   CREATE APP
+========================= */
 
 app.post("/api/apps", async (req, res) => {
 
@@ -152,193 +146,380 @@ app.post("/api/apps", async (req, res) => {
 });
 
 
-// ========================================
-// DEPLOY BOT
-// ========================================
+/* =========================
+   GIT REPOSITORY DEPLOY
+========================= */
 
 app.post(
     "/api/deploy",
-    upload.single("bot"),
     async (req, res) => {
 
-        let tempDirectory = null;
-        let tarFile = null;
+        let repoDirectory = null;
 
         try {
 
-            // --------------------------------
-            // CHECK FILE
-            // --------------------------------
+            const {
+                repo,
+                name,
+                branch,
+                startCommand,
+                env
+            } = req.body;
 
-            if (!req.file) {
 
-                throw new Error(
-                    "Please upload a ZIP file."
-                );
+            /* -------------------------
+               VALIDATE REPO
+            ------------------------- */
+
+            if (!repo) {
+
+                return res.status(400).json({
+                    success: false,
+                    error:
+                        "Repository URL is required."
+                });
 
             }
 
 
             if (
-                !req.file.originalname
-                    .toLowerCase()
-                    .endsWith(".zip")
+                !repo.startsWith(
+                    "https://github.com/"
+                ) &&
+                !repo.startsWith(
+                    "https://gitlab.com/"
+                )
             ) {
 
-                throw new Error(
-                    "Only ZIP files are allowed."
-                );
+                return res.status(400).json({
+                    success: false,
+                    error:
+                        "Only GitHub and GitLab repositories are supported."
+                });
 
             }
 
 
-            // --------------------------------
-            // APP NAME
-            // --------------------------------
+            /* -------------------------
+               APP NAME
+            ------------------------- */
 
-            let appName =
-                String(
-                    req.body.name || "mini-bot"
-                )
-                .toLowerCase()
-                .replace(/[^a-z0-9-]/g, "-")
-                .replace(/-+/g, "-")
-                .replace(/^-|-$/g, "");
-
-
-            if (!appName) {
-
-                appName =
-                    "mini-bot-" +
-                    Date.now();
-
-            }
-
-
-            // Heroku app names max 30 chars
+            let appName = String(
+                name ||
+                "mini-bot-" +
+                Date.now()
+            )
+            .toLowerCase()
+            .replace(
+                /[^a-z0-9-]/g,
+                "-"
+            )
+            .replace(
+                /-+/g,
+                "-"
+            )
+            .replace(
+                /^-|-$/g,
+                ""
+            );
 
             appName =
                 appName.substring(0, 30);
 
 
-            console.log(
-                "Creating app:",
-                appName
-            );
+            /* -------------------------
+               CLONE DIRECTORY
+            ------------------------- */
 
-
-            // --------------------------------
-            // CREATE HEROKU APP
-            // --------------------------------
-
-            const herokuApp =
-                await createApp(appName);
-
-
-            console.log(
-                "App created:",
-                herokuApp.name
-            );
-
-
-            // --------------------------------
-            // TEMP DIRECTORY
-            // --------------------------------
-
-            tempDirectory =
+            repoDirectory =
                 path.join(
                     process.cwd(),
-                    "uploads",
-                    "deploy-" +
+                    "repos",
+                    "repo-" +
                     crypto.randomUUID()
                 );
 
-
             fs.mkdirSync(
-                tempDirectory,
+                repoDirectory,
                 {
                     recursive: true
                 }
             );
 
 
-            // --------------------------------
-            // EXTRACT ZIP
-            // --------------------------------
-
-            execFileSync(
-                "unzip",
-                [
-                    "-q",
-                    req.file.path,
-                    "-d",
-                    tempDirectory
-                ]
+            console.log(
+                "Fetching repository:",
+                repo
             );
 
 
-            // --------------------------------
-            // FIND BOT ROOT
-            // --------------------------------
+            /* -------------------------
+               CLONE REPOSITORY
+            ------------------------- */
 
-            let sourceDirectory =
-                tempDirectory;
+            const cloneArgs = [
+                "clone"
+            ];
+
+            if (branch) {
+
+                cloneArgs.push(
+                    "--branch",
+                    branch
+                );
+
+            }
+
+            cloneArgs.push(
+                "--depth",
+                "1",
+                repo,
+                repoDirectory
+            );
 
 
-            const entries =
+            execFileSync(
+                "git",
+                cloneArgs,
+                {
+                    stdio: "pipe"
+                }
+            );
+
+
+            console.log(
+                "Repository fetched."
+            );
+
+
+            /* -------------------------
+               DETECT PROJECT
+            ------------------------- */
+
+            const files =
                 fs.readdirSync(
-                    tempDirectory
+                    repoDirectory
                 );
 
 
-            if (
-                entries.length === 1 &&
-                fs.statSync(
+            const hasPackageJson =
+                fs.existsSync(
                     path.join(
-                        tempDirectory,
-                        entries[0]
+                        repoDirectory,
+                        "package.json"
                     )
-                ).isDirectory()
+                );
+
+            const hasRequirements =
+                fs.existsSync(
+                    path.join(
+                        repoDirectory,
+                        "requirements.txt"
+                    )
+                );
+
+            const hasProcfile =
+                fs.existsSync(
+                    path.join(
+                        repoDirectory,
+                        "Procfile"
+                    )
+                );
+
+
+            let detectedRuntime =
+                "unknown";
+
+
+            if (hasPackageJson) {
+
+                detectedRuntime =
+                    "nodejs";
+
+            } else if (
+                hasRequirements
             ) {
 
-                sourceDirectory =
-                    path.join(
-                        tempDirectory,
-                        entries[0]
-                    );
+                detectedRuntime =
+                    "python";
 
             }
 
 
-            // --------------------------------
-            // MAKE SURE PROCFILE EXISTS
-            // --------------------------------
+            console.log(
+                "Detected runtime:",
+                detectedRuntime
+            );
 
-            const procfile =
+
+            /* -------------------------
+               CREATE PROCFILE
+            ------------------------- */
+
+            const procfilePath =
                 path.join(
-                    sourceDirectory,
+                    repoDirectory,
                     "Procfile"
                 );
 
 
-            if (!fs.existsSync(procfile)) {
+            if (
+                startCommand &&
+                startCommand.trim()
+            ) {
 
                 fs.writeFileSync(
-                    procfile,
-                    "worker: node bot.js\n"
+                    procfilePath,
+                    `worker: ${startCommand.trim()}\n`
                 );
+
+            } else if (!hasProcfile) {
+
+                if (
+                    detectedRuntime ===
+                    "nodejs"
+                ) {
+
+                    fs.writeFileSync(
+                        procfilePath,
+                        "worker: npm start\n"
+                    );
+
+                } else if (
+                    detectedRuntime ===
+                    "python"
+                ) {
+
+                    fs.writeFileSync(
+                        procfilePath,
+                        "worker: python bot.py\n"
+                    );
+
+                } else {
+
+                    throw new Error(
+                        "Could not detect start command. Please provide one."
+                    );
+
+                }
 
             }
 
 
-            // --------------------------------
-            // CREATE TAR.GZ
-            // --------------------------------
+            /* -------------------------
+               CREATE HEROKU APP
+            ------------------------- */
 
-            tarFile =
+            console.log(
+                "Creating Heroku app:",
+                appName
+            );
+
+
+            const herokuApp =
+                await createApp(
+                    appName
+                );
+
+
+            console.log(
+                "Heroku app created:",
+                herokuApp.name
+            );
+
+
+            /* -------------------------
+               CONFIG VARS
+            ------------------------- */
+
+            if (
+                env &&
+                typeof env === "object"
+            ) {
+
+                const cleanEnv = {};
+
+                for (
+                    const [key, value]
+                    of Object.entries(env)
+                ) {
+
+                    if (
+                        key &&
+                        value !== undefined &&
+                        value !== null
+                    ) {
+
+                        cleanEnv[
+                            String(key)
+                        ] =
+                            String(value);
+
+                    }
+
+                }
+
+
+                if (
+                    Object.keys(cleanEnv)
+                        .length > 0
+                ) {
+
+                    const configResponse =
+                        await fetch(
+                            `https://api.heroku.com/apps/${encodeURIComponent(
+                                herokuApp.name
+                            )}/config-vars`,
+                            {
+                                method: "PATCH",
+
+                                headers: {
+                                    "Authorization":
+                                        `Bearer ${process.env.HEROKU_API_KEY}`,
+
+                                    "Accept":
+                                        "application/vnd.heroku+json; version=3",
+
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify(
+                                        cleanEnv
+                                    )
+                            }
+                        );
+
+
+                    const configResult =
+                        await configResponse.json();
+
+
+                    if (
+                        !configResponse.ok
+                    ) {
+
+                        throw new Error(
+                            configResult.message ||
+                            "Failed to set environment variables."
+                        );
+
+                    }
+
+                }
+
+            }
+
+
+            /* -------------------------
+               CREATE SOURCE ARCHIVE
+            ------------------------- */
+
+            const tarFile =
                 path.join(
                     process.cwd(),
-                    "uploads",
+                    "repos",
                     "source-" +
                     crypto.randomUUID() +
                     ".tar.gz"
@@ -351,15 +532,15 @@ app.post(
                     "-czf",
                     tarFile,
                     "-C",
-                    sourceDirectory,
+                    repoDirectory,
                     "."
                 ]
             );
 
 
-            // --------------------------------
-            // ASK HEROKU FOR SOURCE URL
-            // --------------------------------
+            /* -------------------------
+               CREATE HEROKU SOURCE
+            ------------------------- */
 
             const sourceResponse =
                 await fetch(
@@ -387,19 +568,21 @@ app.post(
                 await sourceResponse.json();
 
 
-            if (!sourceResponse.ok) {
+            if (
+                !sourceResponse.ok
+            ) {
 
                 throw new Error(
                     source.message ||
-                    "Could not create Heroku source"
+                    "Could not create Heroku source."
                 );
 
             }
 
 
-            // --------------------------------
-            // UPLOAD SOURCE
-            // --------------------------------
+            /* -------------------------
+               UPLOAD SOURCE
+            ------------------------- */
 
             const sourceBuffer =
                 fs.readFileSync(
@@ -423,23 +606,20 @@ app.post(
                 );
 
 
-            if (!uploadResponse.ok) {
+            if (
+                !uploadResponse.ok
+            ) {
 
                 throw new Error(
-                    "Failed to upload source to Heroku."
+                    "Failed to upload source."
                 );
 
             }
 
 
-            console.log(
-                "Source uploaded."
-            );
-
-
-            // --------------------------------
-            // START BUILD
-            // --------------------------------
+            /* -------------------------
+               START BUILD
+            ------------------------- */
 
             const buildResponse =
                 await fetch(
@@ -460,21 +640,18 @@ app.post(
                                 "application/json"
                         },
 
-                        body: JSON.stringify({
+                        body:
+                            JSON.stringify({
+                                source_blob: {
+                                    url:
+                                        source
+                                            .source_blob
+                                            .get_url,
 
-                            source_blob: {
-
-                                url:
-                                    source
-                                        .source_blob
-                                        .get_url,
-
-                                version:
-                                    crypto.randomUUID()
-
-                            }
-
-                        })
+                                    version:
+                                        crypto.randomUUID()
+                                }
+                            })
                     }
                 );
 
@@ -483,11 +660,13 @@ app.post(
                 await buildResponse.json();
 
 
-            if (!buildResponse.ok) {
+            if (
+                !buildResponse.ok
+            ) {
 
                 throw new Error(
                     build.message ||
-                    "Could not start Heroku build."
+                    "Could not start build."
                 );
 
             }
@@ -499,37 +678,32 @@ app.post(
             );
 
 
-            // --------------------------------
-            // WAIT FOR BUILD
-            // --------------------------------
+            /* -------------------------
+               WAIT FOR BUILD
+            ------------------------- */
 
-            let buildStatus =
+            let status =
                 build.status;
 
 
             for (
-                let attempt = 0;
-                attempt < 60;
-                attempt++
+                let i = 0;
+                i < 60;
+                i++
             ) {
 
                 if (
-                    buildStatus ===
+                    status ===
                     "succeeded"
                 ) {
-
                     break;
-
                 }
 
-
                 if (
-                    buildStatus ===
+                    status ===
                     "failed"
                 ) {
-
                     break;
-
                 }
 
 
@@ -562,39 +736,34 @@ app.post(
                 build =
                     await checkResponse.json();
 
-
-                buildStatus =
+                status =
                     build.status;
 
 
                 console.log(
-                    "Build status:",
-                    buildStatus
+                    "Build:",
+                    status
                 );
 
             }
 
 
-            // --------------------------------
-            // BUILD FAILED
-            // --------------------------------
-
             if (
-                buildStatus !==
+                status !==
                 "succeeded"
             ) {
 
                 throw new Error(
-                    "Heroku build failed: " +
-                    buildStatus
+                    "Build failed: " +
+                    status
                 );
 
             }
 
 
-            // --------------------------------
-            // START WORKER
-            // --------------------------------
+            /* -------------------------
+               START WORKER
+            ------------------------- */
 
             const formationResponse =
                 await fetch(
@@ -615,15 +784,14 @@ app.post(
                                 "application/json"
                         },
 
-                        body: JSON.stringify([
-
-                            {
-                                type: "worker",
-                                quantity: 1,
-                                size: "eco"
-                            }
-
-                        ])
+                        body:
+                            JSON.stringify([
+                                {
+                                    type: "worker",
+                                    quantity: 1,
+                                    size: "eco"
+                                }
+                            ])
                     }
                 );
 
@@ -632,7 +800,9 @@ app.post(
                 await formationResponse.json();
 
 
-            if (!formationResponse.ok) {
+            if (
+                !formationResponse.ok
+            ) {
 
                 throw new Error(
                     formation.message ||
@@ -642,22 +812,25 @@ app.post(
             }
 
 
-            // --------------------------------
-            // SUCCESS
-            // --------------------------------
+            /* -------------------------
+               SUCCESS
+            ------------------------- */
 
             res.json({
 
-                ok: true,
+                success: true,
 
                 message:
-                    "Bot deployed successfully.",
+                    "Repository deployed successfully.",
 
                 app:
                     herokuApp.name,
 
                 app_url:
                     herokuApp.web_url,
+
+                runtime:
+                    detectedRuntime,
 
                 build:
                     build.id,
@@ -671,6 +844,26 @@ app.post(
             });
 
 
+            /* -------------------------
+               CLEANUP
+            ------------------------- */
+
+            try {
+
+                if (
+                    fs.existsSync(
+                        tarFile
+                    )
+                ) {
+
+                    fs.unlinkSync(
+                        tarFile
+                    );
+
+                }
+
+            } catch {}
+
         } catch (error) {
 
             console.error(
@@ -681,49 +874,30 @@ app.post(
 
             res.status(500).json({
 
-                ok: false,
+                success: false,
 
                 error:
                     error.message
 
             });
 
-
         } finally {
 
-            // --------------------------------
-            // CLEAN TEMP FILES
-            // --------------------------------
-
             try {
 
                 if (
-                    req.file &&
+                    repoDirectory &&
                     fs.existsSync(
-                        req.file.path
+                        repoDirectory
                     )
                 ) {
 
-                    fs.unlinkSync(
-                        req.file.path
-                    );
-
-                }
-
-            } catch {}
-
-
-            try {
-
-                if (
-                    tarFile &&
-                    fs.existsSync(
-                        tarFile
-                    )
-                ) {
-
-                    fs.unlinkSync(
-                        tarFile
+                    fs.rmSync(
+                        repoDirectory,
+                        {
+                            recursive: true,
+                            force: true
+                        }
                     );
 
                 }
@@ -736,9 +910,9 @@ app.post(
 );
 
 
-// ========================================
-// RESTART
-// ========================================
+/* =========================
+   RESTART
+========================= */
 
 app.post(
     "/api/apps/:name/restart",
@@ -760,7 +934,8 @@ app.post(
 
             res.status(500).json({
                 success: false,
-                error: error.message
+                error:
+                    error.message
             });
 
         }
@@ -769,9 +944,9 @@ app.post(
 );
 
 
-// ========================================
-// DELETE
-// ========================================
+/* =========================
+   DELETE
+========================= */
 
 app.delete(
     "/api/apps/:name",
@@ -793,7 +968,8 @@ app.delete(
 
             res.status(500).json({
                 success: false,
-                error: error.message
+                error:
+                    error.message
             });
 
         }
@@ -802,9 +978,9 @@ app.delete(
 );
 
 
-// ========================================
-// START SERVER
-// ========================================
+/* =========================
+   START SERVER
+========================= */
 
 app.listen(
     PORT,
@@ -815,7 +991,7 @@ app.listen(
             "================================"
         );
         console.log(
-            "       MINI HEROKU"
+            "          MINI HEROKU"
         );
         console.log(
             "================================"
@@ -823,12 +999,20 @@ app.listen(
         console.log(
             `Server: http://localhost:${PORT}`
         );
+
         console.log(
             "Heroku API:",
             process.env.HEROKU_API_KEY
                 ? "CONNECTED"
                 : "NOT CONFIGURED"
         );
+
+        console.log(
+            "Heroku Team:",
+            process.env.HEROKU_TEAM ||
+            "NOT CONFIGURED"
+        );
+
         console.log(
             "================================"
         );
