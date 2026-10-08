@@ -1,20 +1,14 @@
 {
-  "name": "sila-md-mini-website",
+  "name": "mini-heroku",
   "version": "1.0.0",
-  "description": "SILA MD MINI Deployment Website",
-  "main": "index.html",
+  "description": "Simple Heroku bot deployment panel",
+  "type": "module",
   "scripts": {
-    "start": "index.html",
-    "build": "echo 'No build needed for static site'",
-    "dev": "npx serve -s public -p 3000"
+    "start": "node server.js"
   },
-  "keywords": ["whatsapp", "bot", "deployment"],
-  "author": "SILA MD",
-  "license": "MIT",
   "dependencies": {
-    "serve": "^14.2.1"
-  },
-  "engines": {
-    "node": ">=18"
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
   }
 }
