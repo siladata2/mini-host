@@ -5,9 +5,9 @@ import os from "os";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import crypto from "crypto";
 
 const execFileAsync = promisify(execFile);
-
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -27,192 +27,159 @@ function sleep(ms) {
 }
 
 function randomId() {
-    return `${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 9)}`;
+    return `${Date.now()}-${crypto.randomBytes(5).toString("hex")}`;
 }
 
 function herokuHeaders(extra = {}) {
     return {
-        Authorization:
-            `Bearer ${process.env.HEROKU_API_KEY}`,
-
-        Accept:
-            "application/vnd.heroku+json; version=3",
-
-        "Content-Type":
-            "application/json",
-
+        Authorization: `Bearer ${process.env.HEROKU_API_KEY}`,
+        Accept: "application/vnd.heroku+json; version=3",
+        "Content-Type": "application/json",
         ...extra
     };
 }
 
 async function herokuRequest(endpoint, options = {}) {
-
     if (!process.env.HEROKU_API_KEY) {
-        throw new Error(
-            "HEROKU_API_KEY haijawekwa kwenye .env."
-        );
+        throw new Error("HEROKU_API_KEY haijawekwa kwenye Heroku Config Vars.");
     }
 
-    const response = await fetch(
-        `${HEROKU_API}${endpoint}`,
-        {
-            ...options,
-
-            headers: {
-                ...herokuHeaders(),
-                ...(options.headers || {})
-            }
+    const response = await fetch(`${HEROKU_API}${endpoint}`, {
+        ...options,
+        headers: {
+            ...herokuHeaders(),
+            ...(options.headers || {})
         }
-    );
+    });
 
     const text = await response.text();
-
     let data;
 
     try {
-        data = text
-            ? JSON.parse(text)
-            : {};
+        data = text ? JSON.parse(text) : {};
     } catch {
-        data = {
-            message: text
-        };
+        data = { message: text };
     }
 
     if (!response.ok) {
-        throw new Error(
+        const detail =
             data.message ||
             data.error ||
-            `Heroku API Error: ${response.status}`
-        );
+            (typeof data === "string" ? data : "");
+
+        throw new Error(`Heroku API (${response.status}): ${detail || "Request failed"}`);
     }
 
     return data;
 }
 
+function getRepoInput(body = {}) {
+    const value =
+        body.repo ??
+        body.repositoryUrl ??
+        body.repository ??
+        body.url ??
+        "";
+
+    return String(value).trim();
+}
+
+function getRepoName(input) {
+    const parsed = parseGithubUrl(input);
+    return parsed.repo;
+}
 
 /* =========================================================
    GITHUB
 ========================================================= */
 
 function parseGithubUrl(input) {
+    let value = String(input || "").trim();
+
+    if (/^(www\.)?github\.com\//i.test(value)) {
+        value = `https://${value}`;
+    }
 
     let url;
 
     try {
-        url = new URL(
-            String(input).trim()
-        );
+        url = new URL(value);
     } catch {
-        throw new Error(
-            "GitHub repository URL si sahihi."
-        );
+        throw new Error("GitHub repository URL si sahihi.");
     }
 
     if (
         url.protocol !== "https:" ||
-        url.hostname !== "github.com"
+        !["github.com", "www.github.com"].includes(url.hostname.toLowerCase())
     ) {
         throw new Error(
-            "Tumia public GitHub repository URL kama https://github.com/user/repo"
+            "Tumia URL kama https://github.com/owner/repository"
         );
     }
 
-    const parts =
-        url.pathname
-            .replace(/^\/|\/$/g, "")
-            .split("/");
+    const parts = url.pathname.split("/").filter(Boolean);
 
     if (parts.length < 2) {
         throw new Error(
-            "GitHub repository URL si sahihi."
+            "GitHub repository URL lazima iwe na owner na repository."
         );
     }
 
     const owner = parts[0];
-    const repo =
-        parts[1].replace(/\.git$/, "");
+    const repo = parts[1].replace(/\.git$/i, "");
 
-    if (!owner || !repo) {
-        throw new Error(
-            "GitHub repository URL si sahihi."
-        );
+    if (
+        !/^[A-Za-z0-9-]+$/.test(owner) ||
+        !/^[A-Za-z0-9_.-]+$/.test(repo)
+    ) {
+        throw new Error("Owner au jina la GitHub repository si sahihi.");
     }
 
     return {
         owner,
         repo,
-        url:
-            `https://github.com/${owner}/${repo}`
+        url: `https://github.com/${owner}/${repo}`
     };
 }
 
-
 async function githubRequest(url) {
+    const response = await fetch(url, {
+        headers: {
+            Accept: "application/vnd.github+json",
+            "User-Agent": "mini-heroku"
+        },
+        signal: AbortSignal.timeout(30000)
+    });
 
-    const response = await fetch(
-        url,
-        {
-            headers: {
-                Accept:
-                    "application/vnd.github+json",
-
-                "User-Agent":
-                    "mini-heroku"
-            }
-        }
-    );
-
-    const text =
-        await response.text();
-
-    let data;
+    const text = await response.text();
+    let data = {};
 
     try {
-        data = text
-            ? JSON.parse(text)
-            : {};
+        data = text ? JSON.parse(text) : {};
     } catch {
         data = {};
     }
 
     if (!response.ok) {
-
         if (response.status === 404) {
-            throw new Error(
-                "Repository haipo au si public."
-            );
+            throw new Error("Repository haipo, si public, au URL si sahihi.");
         }
 
         throw new Error(
-            data.message ||
-            `GitHub API Error: ${response.status}`
+            data.message || `GitHub API error: ${response.status}`
         );
     }
 
     return data;
 }
 
-
-async function getGithubRepository(
-    owner,
-    repo
-) {
-    return await githubRequest(
+async function getGithubRepository(owner, repo) {
+    return githubRequest(
         `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
     );
 }
 
-
-async function getGithubFile(
-    owner,
-    repo,
-    branch,
-    filename
-) {
-
+async function getGithubFile(owner, repo, branch, filename) {
     const url =
         `https://raw.githubusercontent.com/` +
         `${encodeURIComponent(owner)}/` +
@@ -220,103 +187,65 @@ async function getGithubFile(
         `${encodeURIComponent(branch)}/` +
         filename;
 
-    const response =
-        await fetch(
-            url,
-            {
-                headers: {
-                    "User-Agent":
-                        "mini-heroku"
-                }
-            }
-        );
+    const response = await fetch(url, {
+        headers: { "User-Agent": "mini-heroku" },
+        signal: AbortSignal.timeout(20000)
+    });
 
-    if (!response.ok) {
-        return null;
-    }
+    if (!response.ok) return null;
 
-    return await response.text();
+    return response.text();
 }
 
-
 /* =========================================================
-   APP.JSON ENV
+   APP.JSON
 ========================================================= */
 
 function parseEnv(appJson) {
+    const env = appJson?.env || {};
 
-    const env =
-        appJson?.env || {};
-
-    return Object.entries(env)
-        .map(([key, definition]) => {
-
-            if (
-                definition &&
-                typeof definition === "object" &&
-                !Array.isArray(definition)
-            ) {
-
-                return {
-                    key,
-
-                    required:
-                        definition.required !== false,
-
-                    description:
-                        definition.description ||
-                        `Value for ${key}`,
-
-                    value:
-                        definition.value ??
-                        definition.default ??
-                        ""
-                };
-            }
-
+    return Object.entries(env).map(([key, definition]) => {
+        if (
+            definition &&
+            typeof definition === "object" &&
+            !Array.isArray(definition)
+        ) {
             return {
                 key,
-
-                required: false,
-
-                description:
-                    `Value for ${key}`,
-
-                value:
-                    definition == null
-                        ? ""
-                        : String(definition)
+                required: definition.required !== false,
+                description: definition.description || `Value for ${key}`,
+                value: definition.value ?? definition.default ?? ""
             };
-        });
-}
+        }
 
+        return {
+            key,
+            required: false,
+            description: `Value for ${key}`,
+            value: definition == null ? "" : String(definition)
+        };
+    });
+}
 
 /* =========================================================
    REPOSITORY ANALYSIS
 ========================================================= */
 
-async function analyzeRepository(
-    repoUrl
-) {
+async function analyzeRepository(repoUrl) {
+    const github = parseGithubUrl(repoUrl);
 
-    const github =
-        parseGithubUrl(repoUrl);
-
-    const repository =
-        await getGithubRepository(
-            github.owner,
-            github.repo
-        );
+    const repository = await getGithubRepository(
+        github.owner,
+        github.repo
+    );
 
     if (repository.private) {
         throw new Error(
-            "Repository hii ni private. Mini Heroku inaruhusu public repositories tu."
+            "Repository hii ni private. Kwa sasa Mini Heroku inahitaji public repository."
         );
     }
 
-    const branch =
-        repository.default_branch ||
-        "main";
+    const branch = repository.default_branch || "main";
 
     const [
         appJsonText,
@@ -324,126 +253,56 @@ async function analyzeRepository(
         procfileText,
         requirementsText
     ] = await Promise.all([
-
-        getGithubFile(
-            github.owner,
-            github.repo,
-            branch,
-            "app.json"
-        ),
-
-        getGithubFile(
-            github.owner,
-            github.repo,
-            branch,
-            "package.json"
-        ),
-
-        getGithubFile(
-            github.owner,
-            github.repo,
-            branch,
-            "Procfile"
-        ),
-
-        getGithubFile(
-            github.owner,
-            github.repo,
-            branch,
-            "requirements.txt"
-        )
+        getGithubFile(github.owner, github.repo, branch, "app.json"),
+        getGithubFile(github.owner, github.repo, branch, "package.json"),
+        getGithubFile(github.owner, github.repo, branch, "Procfile"),
+        getGithubFile(github.owner, github.repo, branch, "requirements.txt")
     ]);
 
-
     let appJson = {};
-
-    if (appJsonText) {
-
-        try {
-            appJson =
-                JSON.parse(
-                    appJsonText
-                );
-        } catch {
-            throw new Error(
-                "app.json ipo lakini JSON yake si sahihi."
-            );
-        }
-    }
-
-
     let packageJson = {};
 
-    if (packageJsonText) {
-
+    if (appJsonText) {
         try {
-            packageJson =
-                JSON.parse(
-                    packageJsonText
-                );
+            appJson = JSON.parse(appJsonText);
         } catch {
-            throw new Error(
-                "package.json ipo lakini JSON yake si sahihi."
-            );
+            throw new Error("app.json ipo lakini JSON yake si sahihi.");
         }
     }
 
-
-    const env =
-        parseEnv(appJson);
-
+    if (packageJsonText) {
+        try {
+            packageJson = JSON.parse(packageJsonText);
+        } catch {
+            throw new Error("package.json ipo lakini JSON yake si sahihi.");
+        }
+    }
 
     const processes = {};
 
     if (procfileText) {
-
-        for (
-            const line of
-            procfileText.split(/\r?\n/)
-        ) {
-
-            const match =
-                line.match(
-                    /^\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$/
-                );
+        for (const line of procfileText.split(/\r?\n/)) {
+            const match = line.match(
+                /^\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$/
+            );
 
             if (match) {
-
-                processes[
-                    match[1]
-                ] =
-                    match[2].trim();
+                processes[match[1]] = match[2].trim();
             }
         }
     }
 
+    let runtime = "unknown";
 
-    const formation =
-        appJson.formation || {};
-
-
-    let runtime =
-        "unknown";
-
-
-    if (packageJson.name) {
+    if (packageJson.name || packageJson.scripts) {
         runtime = "nodejs";
-    }
-
-    else if (requirementsText) {
+    } else if (requirementsText) {
         runtime = "python";
     }
 
-
-    if (
-        Array.isArray(
-            appJson.buildpacks
-        ) &&
-        appJson.buildpacks.length
-    ) {
+    if (Array.isArray(appJson.buildpacks) && appJson.buildpacks.length) {
         runtime = "custom";
     }
-
 
     const startCommand =
         processes.worker ||
@@ -451,1861 +310,893 @@ async function analyzeRepository(
         packageJson.scripts?.start ||
         null;
 
-
     return {
-
         success: true,
-
         repository: {
-
-            name:
-                repository.name,
-
-            full_name:
-                repository.full_name,
-
-            description:
-                repository.description ||
-                "",
-
+            name: repository.name,
+            full_name: repository.full_name,
+            description: repository.description || "",
             branch,
-
-            url:
-                github.url,
-
-            html_url:
-                repository.html_url
+            url: github.url,
+            html_url: repository.html_url,
+            private: repository.private
         },
-
         app: {
-
-            name:
-                appJson.name ||
-                repository.name,
-
-            description:
-                appJson.description ||
-                repository.description ||
-                "",
-
+            name: appJson.name || repository.name,
+            description: appJson.description || repository.description || "",
             runtime,
-
-            env,
-
-            buildpacks:
-                appJson.buildpacks ||
-                [],
-
-            formation,
-
+            env: parseEnv(appJson),
+            buildpacks: appJson.buildpacks || [],
+            formation: appJson.formation || {},
             processes,
-
             startCommand,
-
-            hasAppJson:
-                Boolean(appJsonText),
-
-            hasPackageJson:
-                Boolean(packageJsonText),
-
-            hasProcfile:
-                Boolean(procfileText)
+            hasAppJson: Boolean(appJsonText),
+            hasPackageJson: Boolean(packageJsonText),
+            hasProcfile: Boolean(procfileText)
         }
     };
 }
-
 
 /* =========================================================
    TEMP SOURCE
 ========================================================= */
 
-async function prepareGithubSource(
-    owner,
-    repo,
-    branch
-) {
+async function prepareGithubSource(owner, repo, branch) {
+    const tempDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), "mini-heroku-")
+    );
 
-    const tempDir =
-        await fs.promises.mkdtemp(
-            path.join(
-                os.tmpdir(),
-                "mini-heroku-"
-            )
-        );
-
-    const archivePath =
-        path.join(
-            tempDir,
-            "github.tar.gz"
-        );
-
-    const outputPath =
-        path.join(
-            tempDir,
-            "source.tar.gz"
-        );
-
-
-    const archiveUrl =
-        `https://github.com/` +
-        `${encodeURIComponent(owner)}/` +
-        `${encodeURIComponent(repo)}` +
-        `/archive/refs/heads/` +
-        `${encodeURIComponent(branch)}.tar.gz`;
-
+    const archivePath = path.join(tempDir, "github.tar.gz");
+    const outputPath = path.join(tempDir, "source.tar.gz");
+    const extractDir = path.join(tempDir, "extract");
 
     try {
+        const archiveUrl =
+            `https://api.github.com/repos/` +
+            `${encodeURIComponent(owner)}/` +
+            `${encodeURIComponent(repo)}/tarball/` +
+            `${encodeURIComponent(branch)}`;
 
-        const response =
-            await fetch(
-                archiveUrl,
-                {
-                    headers: {
-                        "User-Agent":
-                            "mini-heroku"
-                    }
-                }
-            );
+        const response = await fetch(archiveUrl, {
+            headers: {
+                "User-Agent": "mini-heroku",
+                Accept: "application/vnd.github+json"
+            },
+            redirect: "follow",
+            signal: AbortSignal.timeout(120000)
+        });
 
         if (!response.ok) {
-            throw new Error(
-                `GitHub source download failed: ${response.status}`
-            );
+            throw new Error(`GitHub source download failed: ${response.status}`);
         }
 
+        const buffer = Buffer.from(await response.arrayBuffer());
 
-        const buffer =
-            Buffer.from(
-                await response.arrayBuffer()
-            );
+        if (!buffer.length) {
+            throw new Error("GitHub repository archive iko empty.");
+        }
 
+        await fs.promises.writeFile(archivePath, buffer);
 
-        await fs.promises.writeFile(
+        await fs.promises.mkdir(extractDir, { recursive: true });
+
+        await execFileAsync("tar", [
+            "-xzf",
             archivePath,
-            buffer
-        );
+            "-C",
+            extractDir
+        ]);
 
-
-        /*
-         * GitHub archive normally contains:
-         *
-         * repo-branch/
-         *     package.json
-         *     app.json
-         *     ...
-         *
-         * Heroku needs application files
-         * at the archive root.
-         *
-         * So we extract the archive first,
-         * then create a new clean tarball.
-         */
-
-
-        const extractDir =
-            path.join(
-                tempDir,
-                "extract"
-            );
-
-        await fs.promises.mkdir(
+        const entries = await fs.promises.readdir(
             extractDir,
-            {
-                recursive: true
-            }
+            { withFileTypes: true }
         );
-
-
-        await execFileAsync(
-            "tar",
-            [
-                "-xzf",
-                archivePath,
-                "-C",
-                extractDir
-            ]
-        );
-
-
-        const entries =
-            await fs.promises.readdir(
-                extractDir,
-                {
-                    withFileTypes: true
-                }
-            );
-
 
         if (!entries.length) {
-            throw new Error(
-                "GitHub repository archive iko empty."
-            );
+            throw new Error("Hakuna files zilizopatikana kwenye repository.");
         }
 
+        let rootDir = extractDir;
 
-        let rootDir =
-            extractDir;
-
-
-        if (
-            entries.length === 1 &&
-            entries[0].isDirectory()
-        ) {
-            rootDir =
-                path.join(
-                    extractDir,
-                    entries[0].name
-                );
+        if (entries.length === 1 && entries[0].isDirectory()) {
+            rootDir = path.join(extractDir, entries[0].name);
         }
 
-
-        /*
-         * Repack repository contents
-         * directly at tar root.
-         */
-
-        await execFileAsync(
-            "tar",
-            [
-                "-czf",
-                outputPath,
-                "-C",
-                rootDir,
-                "."
-            ]
-        );
-
+        await execFileAsync("tar", [
+            "-czf",
+            outputPath,
+            "-C",
+            rootDir,
+            "."
+        ]);
 
         return {
             file: outputPath,
             cleanup: async () => {
-
-                await fs.promises.rm(
-                    tempDir,
-                    {
-                        recursive: true,
-                        force: true
-                    }
-                );
+                await fs.promises.rm(tempDir, {
+                    recursive: true,
+                    force: true
+                });
             }
         };
-
     } catch (error) {
-
-        await fs.promises.rm(
-            tempDir,
-            {
-                recursive: true,
-                force: true
-            }
-        );
-
+        await fs.promises.rm(tempDir, {
+            recursive: true,
+            force: true
+        });
         throw error;
     }
 }
 
-
 /* =========================================================
-   HEROKU APP
+   HEROKU APP CREATION
 ========================================================= */
 
-async function createHerokuApp(
-    name
-) {
-
-    const team =
-        process.env.HEROKU_TEAM;
+async function createHerokuApp(name) {
+    const team = process.env.HEROKU_TEAM;
 
     if (!team) {
-        throw new Error(
-            "HEROKU_TEAM haijawekwa kwenye .env."
-        );
+        throw new Error("HEROKU_TEAM haijawekwa kwenye Config Vars.");
     }
 
-
-    return await herokuRequest(
-        "/teams/apps",
-        {
-            method: "POST",
-
-            body: JSON.stringify({
-                name,
-
-                team,
-
-                region: "us"
-            })
-        }
-    );
+    return herokuRequest("/teams/apps", {
+        method: "POST",
+        body: JSON.stringify({
+            name,
+            team,
+            region: "us"
+        })
+    });
 }
 
-
-/* =========================================================
-   CONFIG VARS
-========================================================= */
-
-async function setConfigVars(
-    appName,
-    values
-) {
-
-    if (
-        !values ||
-        typeof values !== "object"
-    ) {
-        return {};
-    }
-
+async function setConfigVars(appName, values) {
+    if (!values || typeof values !== "object") return {};
 
     const clean = {};
 
+    for (const [key, value] of Object.entries(values)) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
 
-    for (
-        const [key, value]
-        of Object.entries(values)
-    ) {
-
-        if (
-            !/^[A-Z_][A-Z0-9_]*$/i
-                .test(key)
-        ) {
-            continue;
-        }
-
-
-        if (
-            value !== undefined &&
-            value !== null &&
-            String(value).trim() !== ""
-        ) {
-
-            clean[key] =
-                String(value);
+        if (value !== undefined && value !== null && String(value).trim() !== "") {
+            clean[key] = String(value);
         }
     }
 
+    if (!Object.keys(clean).length) return {};
 
-    if (
-        !Object.keys(clean).length
-    ) {
-        return {};
-    }
-
-
-    return await herokuRequest(
-        `/apps/${encodeURIComponent(
-            appName
-        )}/config-vars`,
+    return herokuRequest(
+        `/apps/${encodeURIComponent(appName)}/config-vars`,
         {
             method: "PATCH",
-
-            body:
-                JSON.stringify(clean)
+            body: JSON.stringify(clean)
         }
     );
 }
 
-
 /* =========================================================
-   SOURCE
+   SOURCE UPLOAD
 ========================================================= */
 
 async function createSource() {
-
-    return await herokuRequest(
-        "/sources",
-        {
-            method: "POST",
-
-            body:
-                JSON.stringify({})
-        }
-    );
+    return herokuRequest("/sources", {
+        method: "POST",
+        body: JSON.stringify({})
+    });
 }
 
+async function uploadSource(putUrl, filePath) {
+    const fileBuffer = await fs.promises.readFile(filePath);
 
-async function uploadSource(
-    putUrl,
-    filePath
-) {
+    // Keep the signed upload URL free from additional headers.
+    const response = await fetch(putUrl, {
+        method: "PUT",
+        body: fileBuffer,
+        signal: AbortSignal.timeout(120000)
+    });
 
-    const fileBuffer =
-        await fs.promises.readFile(
-            filePath
-        );
-
-
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT send Content-Type here.
-     *
-     * Heroku's put_url is a signed
-     * URL. Adding Content-Type can
-     * invalidate the signature.
-     */
-
-    const upload =
-        await fetch(
-            putUrl,
-            {
-                method: "PUT",
-
-                body:
-                    fileBuffer
-            }
-        );
-
-
-    if (!upload.ok) {
-
-        const text =
-            await upload.text();
-
-        throw new Error(
-            `Heroku source upload failed: ${text}`
-        );
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Heroku source upload failed: ${text}`);
     }
-
 
     return true;
 }
 
-
 /* =========================================================
-   BUILD
+   BUILDPACKS
 ========================================================= */
 
-async function createBuild(
-    appName,
-    sourceGetUrl,
-    version,
-    buildpacks
-) {
+function normalizeBuildpacks(buildpacks, runtime) {
+    if (Array.isArray(buildpacks) && buildpacks.length) {
+        return buildpacks.map(item => {
+            let url = typeof item === "string" ? item : item?.url;
 
+            if (!url) return null;
+
+            // Convert known aliases into canonical buildpack URLs.
+            if (url === "heroku/nodejs") {
+                url = "https://buildpack-registry.s3.amazonaws.com/buildpacks/heroku/nodejs.tgz";
+            } else if (url === "heroku/python") {
+                url = "https://buildpack-registry.s3.amazonaws.com/buildpacks/heroku/python.tgz";
+            }
+
+            return { url };
+        }).filter(Boolean);
+    }
+
+    if (runtime === "nodejs") {
+        return [{
+            url: "https://buildpack-registry.s3.amazonaws.com/buildpacks/heroku/nodejs.tgz"
+        }];
+    }
+
+    if (runtime === "python") {
+        return [{
+            url: "https://buildpack-registry.s3.amazonaws.com/buildpacks/heroku/python.tgz"
+        }];
+    }
+
+    return [];
+}
+
+async function createBuild(appName, sourceGetUrl, version, buildpacks) {
     const body = {
-
         source_blob: {
-
-            url:
-                sourceGetUrl,
-
+            url: sourceGetUrl,
             version
         }
     };
 
-
-    if (
-        Array.isArray(buildpacks) &&
-        buildpacks.length
-    ) {
-
-        body.buildpacks =
-            buildpacks.map(
-                item => {
-
-                    if (
-                        typeof item ===
-                        "string"
-                    ) {
-
-                        return {
-                            url: item
-                        };
-                    }
-
-                    return item;
-                }
-            );
+    if (Array.isArray(buildpacks) && buildpacks.length) {
+        body.buildpacks = buildpacks;
     }
 
-
-    return await herokuRequest(
-        `/apps/${encodeURIComponent(
-            appName
-        )}/builds`,
+    return herokuRequest(
+        `/apps/${encodeURIComponent(appName)}/builds`,
         {
             method: "POST",
-
-            body:
-                JSON.stringify(body)
+            body: JSON.stringify(body)
         }
     );
 }
 
-
 /* =========================================================
-   BUILD LOG STREAM
+   JOB LOGS
 ========================================================= */
 
-async function streamBuildLogs(
-    job,
-    outputUrl
-) {
+function addJobLog(job, message) {
+    const lines = String(message).split(/\r?\n/).filter(Boolean);
 
+    for (const line of lines) {
+        job.logs.push(line);
+    }
+
+    job.updatedAt = Date.now();
+
+    for (const client of job.clients) {
+        try {
+            client.write(`data: ${JSON.stringify({
+                type: "log",
+                message: String(message),
+                data: String(message)
+            })}\n\n`);
+        } catch {
+            job.clients.delete(client);
+        }
+    }
+}
+
+async function streamBuildLogs(job, outputUrl) {
     try {
+        const response = await fetch(outputUrl, {
+            signal: AbortSignal.timeout(180000)
+        });
 
-        const response =
-            await fetch(
-                outputUrl
-            );
-
-
-        if (
-            !response.ok ||
-            !response.body
-        ) {
-
-            addJobLog(
-                job,
-                "[Mini Heroku] Build log stream haikupatikana."
-            );
-
+        if (!response.ok || !response.body) {
+            addJobLog(job, "[Mini Heroku] Build log stream haikupatikana.");
             return;
         }
 
-
-        const reader =
-            response.body
-                .getReader();
-
-        const decoder =
-            new TextDecoder();
-
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
         while (true) {
+            const { value, done } = await reader.read();
 
-            const {
-                value,
-                done
-            } =
-                await reader.read();
+            if (done) break;
 
+            const chunk = decoder.decode(value, { stream: true });
 
-            if (done) {
-                break;
-            }
-
-
-            const chunk =
-                decoder.decode(
-                    value,
-                    {
-                        stream: true
-                    }
-                );
-
-
-            if (chunk) {
-                addJobLog(
-                    job,
-                    chunk
-                );
-            }
+            if (chunk) addJobLog(job, chunk);
         }
-
     } catch (error) {
-
-        addJobLog(
-            job,
-            `[Mini Heroku] Log stream error: ${error.message}`
-        );
+        addJobLog(job, `[Mini Heroku] Log stream: ${error.message}`);
     }
 }
-
-
-/* =========================================================
-   JOB LOG
-========================================================= */
-
-function addJobLog(
-    job,
-    message
-) {
-
-    job.logs.push(
-        message
-    );
-
-    job.updatedAt =
-        Date.now();
-
-
-    for (
-        const client
-        of job.clients
-    ) {
-
-        try {
-
-            client.write(
-                `data: ${JSON.stringify({
-                    type: "log",
-                    data: message
-                })}\n\n`
-            );
-
-        } catch {
-            job.clients.delete(
-                client
-            );
-        }
-    }
-}
-
 
 /* =========================================================
    FORMATION
 ========================================================= */
 
-function buildFormation(
-    appData
-) {
-
-    const formation =
-        appData.formation || {};
-
-    const processes =
-        appData.processes || {};
-
+function buildFormation(appData) {
+    const formation = appData.formation || {};
+    const processes = appData.processes || {};
     const updates = [];
 
-
-    for (
-        const [type, config]
-        of Object.entries(
-            formation
-        )
-    ) {
-
-        if (
-            !config ||
-            typeof config !== "object"
-        ) {
-            continue;
-        }
-
+    for (const [type, config] of Object.entries(formation)) {
+        if (!config || typeof config !== "object") continue;
 
         updates.push({
-
             type,
-
-            quantity:
-                Number.isInteger(
-                    config.quantity
-                )
-                    ? config.quantity
-                    : 1,
-
-            size:
-                config.size ||
-                "eco"
+            quantity: Number.isInteger(config.quantity) ? config.quantity : 1,
+            size: config.size || "basic"
         });
     }
 
-
     if (!updates.length) {
-
-        /*
-         * Bots normally use worker.
-         */
-
         if (processes.worker) {
-
             updates.push({
-
                 type: "worker",
-
                 quantity: 1,
-
-                size: "eco"
+                size: "basic"
             });
-
-        }
-
-        else if (processes.web) {
-
+        } else if (processes.web) {
             updates.push({
-
                 type: "web",
-
                 quantity: 1,
-
-                size: "eco"
+                size: "basic"
             });
         }
     }
-
 
     return updates;
 }
 
+async function applyFormation(appName, appData) {
+    const updates = buildFormation(appData);
 
-async function applyFormation(
-    appName,
-    appData
-) {
+    if (!updates.length) return null;
 
-    const updates =
-        buildFormation(
-            appData
-        );
-
-
-    if (!updates.length) {
-        return null;
-    }
-
-
-    return await herokuRequest(
-        `/apps/${encodeURIComponent(
-            appName
-        )}/formation`,
+    return herokuRequest(
+        `/apps/${encodeURIComponent(appName)}/formation`,
         {
             method: "PATCH",
-
-            body:
-                JSON.stringify({
-                    updates
-                })
+            body: JSON.stringify({ updates })
         }
     );
 }
 
+async function deleteHerokuApp(appName) {
+    if (!appName) return;
 
-/* =========================================================
-   DELETE APP
-========================================================= */
-
-async function deleteHerokuApp(
-    appName
-) {
-
-    if (!appName) {
-        return;
-    }
-
-
-    try {
-
-        await herokuRequest(
-            `/apps/${encodeURIComponent(
-                appName
-            )}`,
-            {
-                method: "DELETE"
-            }
-        );
-
-        return true;
-
-    } catch (error) {
-
-        throw error;
-    }
+    return herokuRequest(
+        `/apps/${encodeURIComponent(appName)}`,
+        { method: "DELETE" }
+    );
 }
 
-
 /* =========================================================
-   DEPLOYMENT
+   DEPLOYMENT WORKER
 ========================================================= */
 
-async function runDeployment(
-    job,
-    repoUrl,
-    envValues
-) {
-
+async function runDeployment(job, repoUrl, envValues = {}, requestedAppName = "") {
     let sourceCleanup = null;
 
-
     try {
+        job.status = "analyzing";
+        addJobLog(job, "[Mini Heroku] Analyzing repository...");
 
-        /* ---------------------------------
-           ANALYZE
-        --------------------------------- */
+        const analysis = await analyzeRepository(repoUrl);
+        job.analysis = analysis;
 
-        job.status =
-            "analyzing";
+        addJobLog(job, `[Mini Heroku] Repository: ${analysis.repository.full_name}`);
+        addJobLog(job, `[Mini Heroku] Branch: ${analysis.repository.branch}`);
 
+        const missing = analysis.app.env.filter(item => {
+            if (!item.required) return false;
 
-        addJobLog(
-            job,
-            "[Mini Heroku] Analyzing repository..."
-        );
+            const submitted = envValues?.[item.key];
+            const defaultValue = item.value;
 
-
-        const analysis =
-            await analyzeRepository(
-                repoUrl
+            return (
+                !String(submitted ?? "").trim() &&
+                !String(defaultValue ?? "").trim()
             );
-
-
-        job.analysis =
-            analysis;
-
-
-        addJobLog(
-            job,
-            `[Mini Heroku] Repository: ${analysis.repository.full_name}`
-        );
-
-
-        addJobLog(
-            job,
-            `[Mini Heroku] Branch: ${analysis.repository.branch}`
-        );
-
-
-        /* ---------------------------------
-           REQUIRED ENV
-        --------------------------------- */
-
-        const missing =
-            analysis.app.env.filter(
-                item => {
-
-                    if (!item.required) {
-                        return false;
-                    }
-
-
-                    const submitted =
-                        envValues?.[
-                            item.key
-                        ];
-
-
-                    const defaultValue =
-                        item.value;
-
-
-                    return (
-                        !submitted?.toString()
-                            .trim() &&
-                        !defaultValue
-                    );
-                }
-            );
-
+        });
 
         if (missing.length) {
-
             throw new Error(
-                `Environment variables missing: ${
-                    missing
-                        .map(
-                            item =>
-                                item.key
-                        )
-                        .join(", ")
-                }`
+                `Environment variables missing: ${missing.map(item => item.key).join(", ")}`
             );
         }
 
+        const rawName = requestedAppName || analysis.app.name || analysis.repository.name;
 
-        /* ---------------------------------
-           APP NAME
-        --------------------------------- */
+        let baseName = String(rawName)
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "")
+            .slice(0, 24);
 
-        const baseName =
-            String(
-                analysis.app.name
-            )
-                .toLowerCase()
-                .replace(
-                    /[^a-z0-9-]/g,
-                    "-"
-                )
-                .replace(
-                    /-+/g,
-                    "-"
-                )
-                .replace(
-                    /^-|-$/g,
-                    ""
-                )
-                .slice(0, 25);
+        if (!baseName) baseName = "mini-app";
 
+        // Always use a unique name to reduce app-name collisions.
+        const appName = `${baseName}-${crypto.randomBytes(3).toString("hex")}`;
+        job.appName = appName;
 
-        const appName =
-            `${baseName || "mini-app"}-${Math.random()
-                .toString(36)
-                .slice(2, 6)}`;
+        job.status = "creating_app";
+        addJobLog(job, `[Mini Heroku] Creating Heroku Team app: ${appName}`);
 
-
-        job.appName =
-            appName;
-
-
-        /* ---------------------------------
-           CREATE APP
-        --------------------------------- */
-
-        job.status =
-            "creating_app";
-
-
-        addJobLog(
-            job,
-            `[Mini Heroku] Creating Team app: ${appName}`
-        );
-
-
-        const herokuApp =
-            await createHerokuApp(
-                appName
-            );
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] Heroku Team app created."
-        );
-
-
-        /* ---------------------------------
-           ENV
-        --------------------------------- */
+        const herokuApp = await createHerokuApp(appName);
+        addJobLog(job, "[Mini Heroku] Heroku Team app created.");
 
         const configVars = {};
 
+        for (const item of analysis.app.env) {
+            const submitted = envValues?.[item.key];
 
-        for (
-            const item
-            of analysis.app.env
-        ) {
-
-            const submitted =
-                envValues?.[
-                    item.key
-                ];
-
-
-            if (
-                submitted !== undefined &&
-                submitted !== null &&
-                String(
-                    submitted
-                ).trim() !== ""
-            ) {
-
-                configVars[
-                    item.key
-                ] =
-                    String(submitted);
-
-            }
-
-            else if (
-                item.value !== undefined &&
-                item.value !== null &&
-                String(
-                    item.value
-                ).trim() !== ""
-            ) {
-
-                configVars[
-                    item.key
-                ] =
-                    String(item.value);
+            if (submitted !== undefined && submitted !== null && String(submitted).trim()) {
+                configVars[item.key] = String(submitted);
+            } else if (item.value !== undefined && item.value !== null && String(item.value).trim()) {
+                configVars[item.key] = String(item.value);
             }
         }
 
-
-        if (
-            Object.keys(
-                configVars
-            ).length
-        ) {
-
-            addJobLog(
-                job,
-                `[Mini Heroku] Setting ${
-                    Object.keys(
-                        configVars
-                    ).length
-                } config vars...`
-            );
-
-
-            await setConfigVars(
-                appName,
-                configVars
-            );
+        // Also accept extra environment variables entered in the dashboard.
+        for (const [key, value] of Object.entries(envValues || {})) {
+            if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) &&
+                value !== undefined &&
+                value !== null &&
+                String(value).trim() !== "") {
+                configVars[key] = String(value);
+            }
         }
 
-
-        /* ---------------------------------
-           PREPARE SOURCE
-        --------------------------------- */
-
-        job.status =
-            "preparing_source";
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] Downloading public GitHub source..."
-        );
-
-
-        const github =
-            parseGithubUrl(
-                repoUrl
-            );
-
-
-        const sourcePackage =
-            await prepareGithubSource(
-                github.owner,
-                github.repo,
-                analysis.repository.branch
-            );
-
-
-        sourceCleanup =
-            sourcePackage.cleanup;
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] GitHub source prepared."
-        );
-
-
-        /* ---------------------------------
-           HEROKU SOURCE
-        --------------------------------- */
-
-        job.status =
-            "uploading";
-
-
-        const source =
-            await createSource();
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] Uploading source to Heroku..."
-        );
-
-
-        await uploadSource(
-            source.source_blob.put_url,
-            sourcePackage.file
-        );
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] Source uploaded successfully."
-        );
-
-
-        /* ---------------------------------
-           BUILD
-        --------------------------------- */
-
-        job.status =
-            "building";
-
-
-        addJobLog(
-            job,
-            "[Mini Heroku] Starting Heroku build..."
-        );
-
-
-        const build =
-            await createBuild(
-                appName,
-
-                source.source_blob
-                    .get_url,
-
-                analysis.repository.branch,
-
-                analysis.app.buildpacks
-            );
-
-
-        job.buildId =
-            build.id;
-
-
-        addJobLog(
-            job,
-            `[Mini Heroku] Build started: ${build.id}`
-        );
-
-
-        let logPromise = null;
-
-
-        if (
-            build.output_stream_url
-        ) {
-
-            logPromise =
-                streamBuildLogs(
-                    job,
-                    build.output_stream_url
-                );
+        if (Object.keys(configVars).length) {
+            addJobLog(job, "[Mini Heroku] Setting config vars...");
+            await setConfigVars(appName, configVars);
         }
 
+        job.status = "preparing_source";
+        addJobLog(job, "[Mini Heroku] Downloading GitHub source...");
 
-        /* ---------------------------------
-           WAIT BUILD
-        --------------------------------- */
+        const github = parseGithubUrl(repoUrl);
+        const sourcePackage = await prepareGithubSource(
+            github.owner,
+            github.repo,
+            analysis.repository.branch
+        );
 
-        let finalBuild =
-            build;
+        sourceCleanup = sourcePackage.cleanup;
+        addJobLog(job, "[Mini Heroku] Source archive prepared.");
 
+        job.status = "uploading";
+
+        const source = await createSource();
+        addJobLog(job, "[Mini Heroku] Uploading source to Heroku...");
+
+        await uploadSource(source.source_blob.put_url, sourcePackage.file);
+        addJobLog(job, "[Mini Heroku] Source uploaded.");
+
+        job.status = "building";
+
+        const buildpacks = normalizeBuildpacks(
+            analysis.app.buildpacks,
+            analysis.app.runtime
+        );
+
+        addJobLog(job, "[Mini Heroku] Starting Heroku build...");
+
+        const build = await createBuild(
+            appName,
+            source.source_blob.get_url,
+            analysis.repository.branch,
+            buildpacks
+        );
+
+        job.buildId = build.id;
+        addJobLog(job, `[Mini Heroku] Build started: ${build.id}`);
+
+        if (build.output_stream_url) {
+            // Keep streaming in the background; build status is polled separately.
+            streamBuildLogs(job, build.output_stream_url);
+        }
+
+        let finalBuild = build;
+        let attempts = 0;
 
         while (
-            finalBuild.status ===
-            "pending"
+            ["pending", "queued"].includes(finalBuild.status) &&
+            attempts < 120
         ) {
+            await sleep(5000);
+            attempts++;
 
-            await sleep(3000);
-
-
-            finalBuild =
-                await herokuRequest(
-                    `/apps/${encodeURIComponent(
-                        appName
-                    )}/builds/${encodeURIComponent(
-                        build.id
-                    )}`
-                );
-        }
-
-
-        if (logPromise) {
-            await logPromise;
-        }
-
-
-        if (
-            finalBuild.status !==
-            "succeeded"
-        ) {
-
-            throw new Error(
-                `Heroku build failed with status: ${finalBuild.status}`
+            finalBuild = await herokuRequest(
+                `/apps/${encodeURIComponent(appName)}/builds/${encodeURIComponent(build.id)}`
             );
         }
 
+        if (["pending", "queued"].includes(finalBuild.status)) {
+            throw new Error("Build imechukua muda mrefu sana. Angalia Heroku logs.");
+        }
 
-        addJobLog(
-            job,
-            "[Mini Heroku] Build succeeded."
-        );
+        if (finalBuild.status !== "succeeded") {
+            throw new Error(`Heroku build failed: ${finalBuild.status}`);
+        }
 
+        addJobLog(job, "[Mini Heroku] Build succeeded.");
 
-        /* ---------------------------------
-           FORMATION
-        --------------------------------- */
+        job.status = "starting";
 
-        job.status =
-            "starting";
-
-
-        const formation =
-            await applyFormation(
-                appName,
-                analysis.app
-            );
-
+        const formation = await applyFormation(appName, analysis.app);
 
         if (formation) {
-
-            addJobLog(
-                job,
-                "[Mini Heroku] Dyno formation configured."
-            );
+            addJobLog(job, "[Mini Heroku] Dyno formation configured.");
+        } else {
+            addJobLog(job, "[Mini Heroku] Hakuna process ya web/worker iliyopatikana kwenye app.json au Procfile.");
         }
 
-
-        /* ---------------------------------
-           SUCCESS
-        --------------------------------- */
-
-        job.status =
-            "success";
-
+        job.status = "success";
 
         job.result = {
-
-            app:
-                herokuApp,
-
+            app: herokuApp,
             appName,
-
-            url:
-                herokuApp.web_url ||
-                `https://${appName}.herokuapp.com`,
-
-            build:
-                finalBuild
+            url: herokuApp.web_url || `https://${appName}.herokuapp.com`,
+            build: finalBuild
         };
 
-
-        addJobLog(
-            job,
-            `[Mini Heroku] DEPLOYMENT SUCCESS: ${appName}`
-        );
-
+        addJobLog(job, `[Mini Heroku] DEPLOYMENT SUCCESS: ${appName}`);
 
     } catch (error) {
+        job.status = "failed";
+        job.error = error.message;
 
-        /* ---------------------------------
-           FAILED
-        --------------------------------- */
+        addJobLog(job, `[Mini Heroku] DEPLOYMENT FAILED: ${error.message}`);
 
-        job.status =
-            "failed";
-
-        job.error =
-            error.message;
-
-
-        addJobLog(
-            job,
-            `[Mini Heroku] DEPLOYMENT FAILED: ${error.message}`
-        );
-
-
-        /* ---------------------------------
-           CLEANUP FAILED APP
-        --------------------------------- */
-
+        // Clean up only the app created by this deployment job.
         if (job.appName) {
-
-            addJobLog(
-                job,
-                `[Mini Heroku] Cleaning up failed app: ${job.appName}`
-            );
-
-
             try {
-
-                await deleteHerokuApp(
-                    job.appName
-                );
-
-
-                addJobLog(
-                    job,
-                    "[Mini Heroku] Failed app removed successfully."
-                );
-
+                addJobLog(job, `[Mini Heroku] Removing failed app: ${job.appName}`);
+                await deleteHerokuApp(job.appName);
+                addJobLog(job, "[Mini Heroku] Failed app removed.");
             } catch (cleanupError) {
-
-                addJobLog(
-                    job,
-                    `[Mini Heroku] Cleanup failed: ${cleanupError.message}`
-                );
+                addJobLog(job, `[Mini Heroku] Cleanup failed: ${cleanupError.message}`);
             }
         }
 
-
     } finally {
-
         if (sourceCleanup) {
-
             try {
                 await sourceCleanup();
             } catch {
-                // Ignore temporary file cleanup errors
+                // Ignore temporary-file cleanup failures.
             }
         }
 
-
-        for (
-            const client
-            of job.clients
-        ) {
-
+        for (const client of job.clients) {
             try {
-
-                client.write(
-                    `data: ${JSON.stringify({
-                        type: "complete",
-
-                        status:
-                            job.status,
-
-                        error:
-                            job.error ||
-                            null,
-
-                        result:
-                            job.result ||
-                            null
-                    })}\n\n`
-                );
-
+                client.write(`data: ${JSON.stringify({
+                    type: "complete",
+                    status: job.status,
+                    error: job.error || null,
+                    result: job.result || null
+                })}\n\n`);
                 client.end();
-
             } catch {
-                // Client disconnected
+                // Client disconnected.
             }
         }
-
 
         job.clients.clear();
     }
 }
 
-
 /* =========================================================
    HEALTH
 ========================================================= */
 
-app.get(
-    "/api/health",
-    async (req, res) => {
+app.get("/api/health", (req, res) => {
+    res.json({
+        ok: true,
+        success: true,
+        status: "ok",
+        service: "Mini Heroku",
+        configured: Boolean(process.env.HEROKU_API_KEY),
+        team: process.env.HEROKU_TEAM || null,
+        time: new Date().toISOString()
+    });
+});
 
-        res.json({
+app.get("/api/config-status", (req, res) => {
+    res.json({
+        apiKeyConfigured: Boolean(process.env.HEROKU_API_KEY),
+        teamConfigured: Boolean(process.env.HEROKU_TEAM),
+        portConfigured: true,
+        uiFound: fs.existsSync(path.join(process.cwd(), "index.html"))
+    });
+});
 
-            success: true,
+/* =========================================================
+   ANALYZE ROUTE
+========================================================= */
 
-            service:
-                "mini-heroku",
+app.post("/api/repository/analyze", async (req, res) => {
+    try {
+        const repoUrl = getRepoInput(req.body);
 
-            configured:
-                Boolean(
-                    process.env.HEROKU_API_KEY
-                ),
+        if (!repoUrl) {
+            return res.status(400).json({
+                success: false,
+                error: "Weka GitHub repository URL.",
+                message: "Weka GitHub repository URL."
+            });
+        }
 
-            team:
-                process.env.HEROKU_TEAM ||
-                null
+        const result = await analyzeRepository(repoUrl);
+
+        return res.json(result);
+
+    } catch (error) {
+        console.error("[ANALYZE ERROR]", error);
+
+        return res.status(400).json({
+            success: false,
+            error: error.message,
+            message: error.message
         });
     }
-);
-
-
-/* =========================================================
-   ANALYZE
-========================================================= */
-
-app.post(
-    "/api/repository/analyze",
-    async (req, res) => {
-
-        try {
-
-            const {
-                repo
-            } = req.body;
-
-
-            if (!repo) {
-
-                return res.status(400)
-                    .json({
-
-                        success: false,
-
-                        error:
-                            "Weka GitHub repository URL."
-                    });
-            }
-
-
-            const result =
-                await analyzeRepository(
-                    repo
-                );
-
-
-            res.json(
-                result
-            );
-
-        } catch (error) {
-
-            res.status(400)
-                .json({
-
-                    success: false,
-
-                    error:
-                        error.message
-                });
-        }
-    }
-);
-
+});
 
 /* =========================================================
-   DEPLOY
+   DEPLOY ROUTE
 ========================================================= */
 
-app.post(
-    "/api/deploy",
-    async (req, res) => {
+app.post("/api/deploy", async (req, res) => {
+    try {
+        const repoUrl = getRepoInput(req.body);
+        const env = req.body?.env || {};
+        const requestedAppName = String(
+            req.body?.appName || req.body?.name || ""
+        ).trim();
 
-        try {
-
-            const {
-                repo,
-                env
-            } = req.body;
-
-
-            if (!repo) {
-
-                return res.status(400)
-                    .json({
-
-                        success: false,
-
-                        error:
-                            "Weka GitHub repository URL."
-                    });
-            }
-
-
-            if (
-                !process.env.HEROKU_API_KEY
-            ) {
-
-                return res.status(500)
-                    .json({
-
-                        success: false,
-
-                        error:
-                            "HEROKU_API_KEY haijawekwa."
-                    });
-            }
-
-
-            if (
-                !process.env.HEROKU_TEAM
-            ) {
-
-                return res.status(500)
-                    .json({
-
-                        success: false,
-
-                        error:
-                            "HEROKU_TEAM haijawekwa."
-                    });
-            }
-
-
-            const deploymentId =
-                randomId();
-
-
-            const job = {
-
-                id:
-                    deploymentId,
-
-                status:
-                    "queued",
-
-                logs: [],
-
-                clients:
-                    new Set(),
-
-                createdAt:
-                    Date.now(),
-
-                updatedAt:
-                    Date.now(),
-
-                appName:
-                    null,
-
-                error:
-                    null,
-
-                result:
-                    null
-            };
-
-
-            deployments.set(
-                deploymentId,
-                job
-            );
-
-
-            runDeployment(
-                job,
-                repo,
-                env || {}
-            );
-
-
-            res.json({
-
-                success: true,
-
-                deploymentId
+        if (!repoUrl) {
+            return res.status(400).json({
+                success: false,
+                error: "Weka GitHub repository URL.",
+                message: "Weka GitHub repository URL."
             });
-
-
-        } catch (error) {
-
-            res.status(500)
-                .json({
-
-                    success: false,
-
-                    error:
-                        error.message
-                });
         }
-    }
-);
 
+        // Validate URL before creating a deployment job.
+        parseGithubUrl(repoUrl);
+
+        if (!process.env.HEROKU_API_KEY) {
+            return res.status(500).json({
+                success: false,
+                error: "HEROKU_API_KEY haijawekwa."
+            });
+        }
+
+        if (!process.env.HEROKU_TEAM) {
+            return res.status(500).json({
+                success: false,
+                error: "HEROKU_TEAM haijawekwa."
+            });
+        }
+
+        const deploymentId = randomId();
+
+        const job = {
+            id: deploymentId,
+            status: "queued",
+            logs: [],
+            clients: new Set(),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            appName: null,
+            error: null,
+            result: null
+        };
+
+        deployments.set(deploymentId, job);
+
+        // Do not await: respond immediately while the deployment runs.
+        runDeployment(job, repoUrl, env, requestedAppName).catch(error => {
+            console.error("[DEPLOY WORKER ERROR]", error);
+        });
+
+        return res.status(202).json({
+            success: true,
+            deploymentId,
+            id: deploymentId,
+            status: "queued"
+        });
+
+    } catch (error) {
+        console.error("[DEPLOY REQUEST ERROR]", error);
+
+        return res.status(400).json({
+            success: false,
+            error: error.message,
+            message: error.message
+        });
+    }
+});
 
 /* =========================================================
    DEPLOYMENT STATUS
 ========================================================= */
 
-app.get(
-    "/api/deploy/:id",
-    (req, res) => {
+app.get("/api/deploy/:id", (req, res) => {
+    const job = deployments.get(req.params.id);
 
-        const job =
-            deployments.get(
-                req.params.id
-            );
-
-
-        if (!job) {
-
-            return res.status(404)
-                .json({
-
-                    success: false,
-
-                    error:
-                        "Deployment haipatikani."
-                });
-        }
-
-
-        res.json({
-
-            success: true,
-
-            id:
-                job.id,
-
-            status:
-                job.status,
-
-            appName:
-                job.appName ||
-                null,
-
-            error:
-                job.error ||
-                null,
-
-            result:
-                job.result ||
-                null,
-
-            logs:
-                job.logs
+    if (!job) {
+        return res.status(404).json({
+            success: false,
+            error: "Deployment haipatikani."
         });
     }
-);
 
+    return res.json({
+        success: true,
+        id: job.id,
+        status: job.status,
+        appName: job.appName || null,
+        error: job.error || null,
+        result: job.result || null,
+        logs: job.logs
+    });
+});
 
 /* =========================================================
    LIVE LOGS
 ========================================================= */
 
-app.get(
-    "/api/deploy/:id/logs",
-    (req, res) => {
+app.get("/api/deploy/:id/logs", (req, res) => {
+    const job = deployments.get(req.params.id);
 
-        const job =
-            deployments.get(
-                req.params.id
-            );
-
-
-        if (!job) {
-            return res.status(404)
-                .end();
-        }
-
-
-        res.setHeader(
-            "Content-Type",
-            "text/event-stream"
-        );
-
-        res.setHeader(
-            "Cache-Control",
-            "no-cache"
-        );
-
-        res.setHeader(
-            "Connection",
-            "keep-alive"
-        );
-
-
-        res.flushHeaders();
-
-
-        /*
-         * Send existing logs first.
-         */
-
-        for (
-            const log
-            of job.logs
-        ) {
-
-            res.write(
-                `data: ${JSON.stringify({
-                    type: "log",
-                    data: log
-                })}\n\n`
-            );
-        }
-
-
-        /*
-         * Deployment already finished.
-         */
-
-        if (
-            job.status ===
-            "success" ||
-            job.status ===
-            "failed"
-        ) {
-
-            res.write(
-                `data: ${JSON.stringify({
-                    type: "complete",
-
-                    status:
-                        job.status,
-
-                    error:
-                        job.error ||
-                        null,
-
-                    result:
-                        job.result ||
-                        null
-                })}\n\n`
-            );
-
-
-            return res.end();
-        }
-
-
-        job.clients.add(
-            res
-        );
-
-
-        req.on(
-            "close",
-            () => {
-                job.clients.delete(
-                    res
-                );
-            }
-        );
+    if (!job) {
+        return res.status(404).end();
     }
-);
 
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    // Send current logs in a format the dashboard can display.
+    for (const log of job.logs) {
+        res.write(`data: ${JSON.stringify({
+            type: "log",
+            message: log,
+            data: log
+        })}\n\n`);
+    }
+
+    if (["success", "failed"].includes(job.status)) {
+        res.write(`data: ${JSON.stringify({
+            type: "complete",
+            status: job.status,
+            error: job.error || null,
+            result: job.result || null
+        })}\n\n`);
+
+        return res.end();
+    }
+
+    job.clients.add(res);
+
+    req.on("close", () => {
+        job.clients.delete(res);
+    });
+});
 
 /* =========================================================
-   APPS
+   HEROKU APPS
 ========================================================= */
 
-app.get(
-    "/api/apps",
-    async (req, res) => {
+app.get("/api/apps", async (req, res) => {
+    try {
+        const team = process.env.HEROKU_TEAM;
 
-        try {
-
-            const team =
-                process.env.HEROKU_TEAM;
-
-
-            if (!team) {
-
-                throw new Error(
-                    "HEROKU_TEAM haijawekwa."
-                );
-            }
-
-
-            const apps =
-                await herokuRequest(
-                    `/teams/${encodeURIComponent(
-                        team
-                    )}/apps`
-                );
-
-
-            res.json({
-
-                success: true,
-
-                apps
-            });
-
-
-        } catch (error) {
-
-            res.status(500)
-                .json({
-
-                    success: false,
-
-                    error:
-                        error.message
-                });
+        if (!team) {
+            throw new Error("HEROKU_TEAM haijawekwa.");
         }
-    }
-);
 
+        const result = await herokuRequest(
+            `/teams/${encodeURIComponent(team)}/apps`
+        );
+
+        const apps = Array.isArray(result) ? result : [];
+
+        return res.json({
+            success: true,
+            apps
+        });
+
+    } catch (error) {
+        console.error("[APPS ERROR]", error);
+
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            apps: []
+        });
+    }
+});
 
 /* =========================================================
-   RESTART
+   RESTART APP
 ========================================================= */
 
-app.post(
-    "/api/apps/:name/restart",
-    async (req, res) => {
+app.post("/api/apps/:name/restart", async (req, res) => {
+    try {
+        const name = req.params.name;
 
-        try {
+        await herokuRequest(
+            `/apps/${encodeURIComponent(name)}/dynos`,
+            { method: "DELETE" }
+        );
 
-            await herokuRequest(
-                `/apps/${encodeURIComponent(
-                    req.params.name
-                )}/dynos`,
-                {
-                    method: "DELETE"
-                }
-            );
+        return res.json({
+            success: true,
+            message: `Restart request imetumwa kwa ${name}.`
+        });
 
-
-            res.json({
-
-                success: true
-            });
-
-
-        } catch (error) {
-
-            res.status(500)
-                .json({
-
-                    success: false,
-
-                    error:
-                        error.message
-                });
-        }
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-);
-
+});
 
 /* =========================================================
-   DELETE
+   DELETE APP
 ========================================================= */
 
-app.delete(
-    "/api/apps/:name",
-    async (req, res) => {
+app.delete("/api/apps/:name", async (req, res) => {
+    try {
+        await deleteHerokuApp(req.params.name);
 
-        try {
+        return res.json({
+            success: true,
+            message: "App imefutwa."
+        });
 
-            await deleteHerokuApp(
-                req.params.name
-            );
-
-
-            res.json({
-
-                success: true
-            });
-
-
-        } catch (error) {
-
-            res.status(500)
-                .json({
-
-                    success: false,
-
-                    error:
-                        error.message
-                });
-        }
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-);
-
+});
 
 /* =========================================================
    CLEAN OLD JOBS
 ========================================================= */
 
-setInterval(
-    () => {
+setInterval(() => {
+    const now = Date.now();
 
-        const now =
-            Date.now();
-
-
-        for (
-            const [id, job]
-            of deployments
+    for (const [id, job] of deployments) {
+        if (
+            now - job.createdAt > 60 * 60 * 1000 &&
+            job.clients.size === 0
         ) {
-
-            if (
-                now - job.createdAt >
-                60 * 60 * 1000
-            ) {
-
-                deployments.delete(
-                    id
-                );
-            }
+            deployments.delete(id);
         }
-
-    },
-    10 * 60 * 1000
-);
-
+    }
+}, 10 * 60 * 1000);
 
 /* =========================================================
    START SERVER
 ========================================================= */
 
-app.listen(
-    PORT,
-    () => {
-
-        console.log(
-            `Mini Heroku running on port ${PORT}`
-        );
-    }
-);
+app.listen(PORT, () => {
+    console.log(`Mini Heroku running on port ${PORT}`);
+    console.log(`Heroku API key configured: ${Boolean(process.env.HEROKU_API_KEY)}`);
+    console.log(`Heroku Team configured: ${Boolean(process.env.HEROKU_TEAM)}`);
+});
