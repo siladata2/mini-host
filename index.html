@@ -259,82 +259,83 @@ async function checkHealth() {
 
 /* ANALYZE REPOSITORY */
 async function analyzeRepository() {
-    const url = repoUrl.value.trim();
+const input = document.getElementById("repoUrl");
+const url = input ? input.value.trim() : "";
 
-    if (!url) {
-        showMessage("Weka GitHub repository URL kwanza.");
-        repoUrl.focus();
-        return;
-    }
+console.log("Repository URL entered:", url);
 
-    if (!/^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/?#]+/i.test(url)) {
-        showMessage("Weka URL sahihi ya GitHub, mfano https://github.com/username/my-bot");
-        return;
-    }
-
-    hideMessage();
-    analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing';
-    envCard.classList.remove("show");
-    repoInfo.classList.remove("show");
-    currentAnalysis = null;
-
-    try {
-        const response = await fetch("/api/repository/analyze", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({repo:url})
-        });
-
-        const data = await readResponse(response);
-
-        if (data.success === false) {
-            throw new Error(data.error || "Repository analysis failed.");
-        }
-        if (!data.repository || !data.app) {
-            console.error("Unexpected analysis response:", data);
-            throw new Error("Server response haina repository/app data inayotarajiwa.");
-        }
-
-        currentAnalysis = data;
-        renderRepository(data);
-        renderEnvironment(data);
-
-        showMessage("Repository imepatikana. Kagua environment variables kabla ya deploy.", "success");
-    } catch (error) {
-        showMessage(error.message || "Imeshindikana kusoma repository.");
-        console.error("Analyze error:", error);
-    } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.textContent = "Analyze";
-    }
+if (!url) {
+    showMessage("Weka GitHub repository URL kwanza.");
+    if (input) input.focus();
+    return;
 }
 
-function renderRepository(data) {
-    const repo = data.repository || {};
-    const app = data.app || {};
-
-    $("repoName").textContent = repo.full_name || repo.name || "GitHub repository";
-    $("repoDescription").textContent = repo.description || "No repository description.";
-
-    const meta = $("repoMeta");
-    meta.replaceChildren();
-
-    addMeta(meta, "Branch: " + (repo.branch || "default"));
-    addMeta(meta, "Runtime: " + (app.runtime || "Unknown"));
-    if (app.hasAppJson) addMeta(meta, "app.json ✓");
-    if (app.hasProcfile) addMeta(meta, "Procfile ✓");
-    if (app.hasPackageJson) addMeta(meta, "package.json ✓");
-
-    repoInfo.classList.add("show");
-}
-function addMeta(parent, text) {
-    const span = document.createElement("span");
-    span.textContent = text;
-    parent.appendChild(span);
+if (!/^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/?#]+\/?$/i.test(url)) {
+    showMessage(
+        "URL si sahihi. Mfano: https://github.com/siladata2/Tyrex-bot"
+    );
+    return;
 }
 
-/* ENVIRONMENT VARIABLES */
+hideMessage();
+analyzeBtn.disabled = true;
+analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing';
+
+envCard.classList.remove("show");
+repoInfo.classList.remove("show");
+currentAnalysis = null;
+
+try {
+    const response = await fetch("/api/repository/analyze", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            repo: url.replace(/\/+$/, "")
+        })
+    });
+
+    const data = await readResponse(response);
+
+    if (!response.ok || data.success === false) {
+        throw new Error(
+            data.error || "Repository analysis imeshindwa."
+        );
+    }
+
+    if (!data.repository || !data.app) {
+        console.error("Unexpected server response:", data);
+        throw new Error(
+            "Server haijarudisha repository na app data inayotarajiwa."
+        );
+    }
+
+    currentAnalysis = data;
+
+    renderRepository(data);
+    renderEnvironment(data);
+
+    showMessage(
+        "Repository imepatikana! Kagua environment variables kabla ya deploy.",
+        "success"
+    );
+
+} catch (error) {
+    console.error("Repository analysis error:", error);
+
+    showMessage(
+        error.message || "Imeshindikana kusoma repository."
+    );
+
+} finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = "Analyze";
+}
+
+}
+    
+/*ENVIRONMENT VARIABLES */
 function renderEnvironment(data) {
     const env = Array.isArray(data.app.env) ? data.app.env : [];
     envList.replaceChildren();
