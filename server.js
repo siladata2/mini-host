@@ -16,7 +16,12 @@ const HEROKU_TEAM = process.env.HEROKU_TEAM;
 const execFileAsync = promisify(execFile);
 
 app.use(express.json({ limit: "2mb" }));
-app.use(express.static("public"));
+
+app.use(express.static(__dirname));
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
+});
 
 const deployments = new Map();
 
