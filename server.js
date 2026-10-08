@@ -14,6 +14,10 @@ const HEROKU_API_KEY = process.env.HEROKU_API_KEY;
 const HEROKU_TEAM = process.env.HEROKU_TEAM;
 
 const execFileAsync = promisify(execFile);
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(express.json({ limit: "2mb" }));
 
