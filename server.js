@@ -14,18 +14,9 @@ const HEROKU_API_KEY = process.env.HEROKU_API_KEY;
 const HEROKU_TEAM = process.env.HEROKU_TEAM;
 
 const execFileAsync = promisify(execFile);
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 app.use(express.json({ limit: "2mb" }));
-
-app.use(express.static(__dirname));
-
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "index.html"));
-});
+app.use(express.static("public"));
 
 const deployments = new Map();
 
@@ -939,4 +930,4 @@ app.delete("/api/apps/:name", async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Mini Heroku running on port ${PORT}`);
-});
+}); 
