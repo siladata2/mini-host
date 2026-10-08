@@ -1,13 +1,13 @@
 <!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#070812">
-<title>Mini Heroku — Deployment Dashboard</title><style>
+<title>Mini Heroku | Deployment Dashboard</title><style>
 :root{
     --bg:#070812;
-    --panel:rgba(15,17,30,.82);
-    --border:rgba(255,255,255,.08);
+    --panel:#101221;
+    --border:rgba(255,255,255,.09);
     --muted:#9296a8;
     --purple:#7657ff;
     --cyan:#22d3ee;
@@ -16,127 +16,131 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{
-    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
     background:
-        radial-gradient(circle at 20% 10%,rgba(120,80,255,.18),transparent 30%),
-        radial-gradient(circle at 90% 20%,rgba(0,210,255,.12),transparent 30%),
+        radial-gradient(circle at 15% 10%,rgba(120,80,255,.19),transparent 32%),
+        radial-gradient(circle at 90% 15%,rgba(0,210,255,.12),transparent 30%),
         var(--bg);
     color:#fff;
     min-height:100vh;
 }
-.container{width:min(1050px,92%);margin:auto;padding:35px 0 70px}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:55px;gap:12px}
-.logo{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:800}
+.container{width:min(1050px,94%);margin:auto;padding:28px 0 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:48px}
+.logo{display:flex;align-items:center;gap:11px;font-size:21px;font-weight:850}
 .logo-box{
-    width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
     background:linear-gradient(135deg,var(--purple),var(--cyan));
-    box-shadow:0 0 30px rgba(118,87,255,.35)
+    box-shadow:0 0 28px rgba(118,87,255,.28)
 }
 .status{
-    display:flex;align-items:center;gap:8px;padding:8px 13px;
-    border:1px solid var(--border);background:rgba(255,255,255,.04);
-    border-radius:30px;font-size:12px;color:#aaa
+    display:flex;align-items:center;gap:8px;padding:9px 12px;
+    border:1px solid var(--border);background:#ffffff08;border-radius:30px;
+    font-size:11px;color:#b5b8c7
 }
 .dot{width:8px;height:8px;border-radius:50%;background:#777}
-.dot.online{background:var(--green);box-shadow:0 0 12px var(--green)}
-.hero{text-align:center;margin-bottom:35px}
+.dot.online{background:var(--green);box-shadow:0 0 10px var(--green)}
+.hero{text-align:center;margin-bottom:32px}
 .badge{
-    display:inline-block;padding:7px 13px;border-radius:30px;
-    background:rgba(118,87,255,.1);border:1px solid rgba(118,87,255,.25);
-    color:#b8aaff;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:18px
+    display:inline-block;padding:7px 12px;border-radius:30px;
+    background:#7657ff18;border:1px solid #7657ff44;color:#b8aaff;
+    font-size:10px;font-weight:800;letter-spacing:.8px;margin-bottom:19px
 }
-h1{font-size:clamp(38px,7vw,70px);line-height:1;letter-spacing:-3px;margin-bottom:18px}
+h1{font-size:clamp(38px,7vw,68px);line-height:1.04;letter-spacing:-2.8px;margin-bottom:18px}
 .gradient{
     background:linear-gradient(90deg,#fff,#a995ff,#48dfff);
     -webkit-background-clip:text;background-clip:text;color:transparent
 }
-.hero p{max-width:600px;margin:auto;color:var(--muted);line-height:1.7;font-size:15px}
+.hero p{max-width:610px;margin:auto;color:var(--muted);line-height:1.8;font-size:14px}
 .card{
-    background:var(--panel);border:1px solid var(--border);border-radius:24px;
-    padding:25px;backdrop-filter:blur(18px);
-    box-shadow:0 20px 70px rgba(0,0,0,.25);margin-bottom:22px
+    background:rgba(16,18,33,.86);border:1px solid var(--border);
+    border-radius:22px;padding:24px;margin-bottom:20px;
+    box-shadow:0 18px 65px #0003;backdrop-filter:blur(15px)
 }
 .card-title{font-size:16px;font-weight:800;margin-bottom:7px}
-.card-subtitle{color:#7f8497;font-size:12px;margin-bottom:20px;line-height:1.6}
-label{display:block;color:#9da2b4;font-size:12px;margin-bottom:8px}
+.card-subtitle{font-size:12px;color:#858a9d;line-height:1.7;margin-bottom:20px}
+label{display:block;color:#aeb2c2;font-size:12px;margin-bottom:8px}
 .input-wrap{display:flex;gap:10px}
 input{
-    width:100%;min-width:0;border:none;outline:none;color:#fff;
-    background:#0a0c17;border:1px solid #202335;border-radius:13px;
-    padding:15px;font-size:14px;transition:.2s
+    width:100%;min-width:0;padding:15px 14px;border-radius:12px;
+    background:#090b16;border:1px solid #282b40;color:white;
+    font-size:14px;outline:none
 }
-input:focus{border-color:#725cff;box-shadow:0 0 0 3px rgba(114,92,255,.1)}
+input:focus{border-color:var(--purple);box-shadow:0 0 0 3px #7657ff20}
 button{
-    border:none;cursor:pointer;color:#fff;font-weight:800;
-    border-radius:13px;transition:.2s
+    border:0;border-radius:12px;color:white;font-weight:800;cursor:pointer;
+    transition:filter .2s,transform .2s;font-size:12px
 }
-button:disabled{opacity:.45;cursor:not-allowed}
+button:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait}
 .analyze{
-    padding:0 22px;background:linear-gradient(135deg,#7657ff,#5940dc);
-    box-shadow:0 10px 30px rgba(118,87,255,.22);white-space:nowrap
+    flex-shrink:0;padding:0 23px;
+    background:linear-gradient(135deg,#7657ff,#5940dc)
 }
 .deploy{
-    width:100%;padding:16px;background:linear-gradient(135deg,#7657ff,#22aeea);
-    margin-top:20px;font-size:14px
+    width:100%;padding:16px;margin-top:18px;
+    background:linear-gradient(135deg,#7657ff,#22aeea);font-size:13px
 }
-button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
 .repo-info{
-    display:none;margin-top:22px;padding:18px;border-radius:16px;
-    background:#0a0c17;border:1px solid #202335
+    display:none;margin-top:18px;padding:17px;background:#090b16;
+    border:1px solid #282b40;border-radius:14px
 }
 .repo-info.show{display:block}
-.repo-name{font-weight:800;margin-bottom:6px;overflow-wrap:anywhere}
-.repo-description{color:#777d90;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
-.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.meta span{padding:6px 9px;border-radius:8px;background:#151827;color:#9fa4b5;font-size:10px}
+.repo-name{font-weight:800;font-size:14px;overflow-wrap:anywhere;margin-bottom:7px}
+.repo-description{font-size:12px;color:#858a9d;line-height:1.6}
+.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
+.meta span{font-size:10px;color:#b1b5c5;background:#1a1d30;padding:7px 9px;border-radius:8px}
+.message{
+    display:none;padding:13px;margin-top:15px;border-radius:11px;
+    font-size:12px;line-height:1.7;overflow-wrap:anywhere
+}
+.message.show{display:block}
+.message.error{color:#ff9bad;background:#ff466414;border:1px solid #ff46642a}
+.message.success{color:#75e7ae;background:#27e38a10;border:1px solid #27e38a26}
 #envCard,#logsCard{display:none}
 #envCard.show,#logsCard.show{display:block}
-.env-row{margin-bottom:15px}
-.env-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.required{color:#ff7891;font-size:9px;font-weight:800}
-.env-description{color:#868b9e;font-size:10px;margin:5px 0 8px;line-height:1.5}
-.env-input{width:100%}
-.message{display:none;margin-top:15px;padding:13px;border-radius:12px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
-.message.show{display:block}
-.message.error{color:#ff9bad;background:rgba(255,70,100,.08);border:1px solid rgba(255,70,100,.15)}
-.message.success{color:#75e7ae;background:rgba(39,227,138,.07);border:1px solid rgba(39,227,138,.13)}
+.env-row{margin-bottom:17px}
+.env-header{display:flex;justify-content:space-between;gap:10px}
+.required{font-size:9px;color:#ff7891;font-weight:800}
+.env-description{font-size:10px;color:#858a9d;margin:5px 0 8px;line-height:1.5}
+.env-input{display:block}
 .logs{
-    height:320px;overflow:auto;padding:17px;background:#05060b;
-    border:1px solid #181b28;border-radius:15px;font-family:monospace;
-    font-size:11px;line-height:1.7;color:#aeb3c4;white-space:pre-wrap;overflow-wrap:anywhere
+    height:300px;overflow:auto;background:#06070d;border:1px solid #202236;
+    border-radius:13px;padding:15px;font:11px/1.8 monospace;
+    color:#bdc2d1;white-space:pre-wrap;overflow-wrap:anywhere
 }
-.log-line{border-bottom:1px solid rgba(255,255,255,.025);padding:2px 0;overflow-wrap:anywhere}
+.log-line{padding:2px 0;border-bottom:1px solid #ffffff08;overflow-wrap:anywhere}
+.error-text{color:#ff7189}
 .success-text{color:#4de49a}
-.error-text{color:#ff6e88}
 .apps{margin-top:35px}
-.apps-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
-.apps-title{font-size:20px;font-weight:800}
-.refresh-btn{padding:9px 12px;background:#171a29;color:#c0c4d3;font-size:11px}
+.apps-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}
+.apps-title{font-size:20px;font-weight:850}
+.refresh-btn,.small-btn{background:#1b1e30;color:#c3c6d5;padding:9px 12px}
+.small-btn{font-size:10px}
+.small-btn.delete{color:#ff7189}
 .app{
-    display:flex;justify-content:space-between;align-items:center;gap:15px;
-    padding:16px;border:1px solid rgba(255,255,255,.07);
-    background:rgba(255,255,255,.025);border-radius:15px;margin-bottom:9px
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:16px;margin-bottom:9px;border-radius:14px;
+    background:#ffffff05;border:1px solid var(--border)
 }
-.app-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}
-.app-meta{color:#868b9e;font-size:10px;margin-top:4px;overflow-wrap:anywhere}
+.app-name{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.app-meta{font-size:10px;color:#858a9d;margin-top:5px;overflow-wrap:anywhere}
 .app-actions{display:flex;gap:7px;flex-shrink:0}
-.small-btn{padding:8px 11px;background:#171a29;color:#c0c4d3;font-size:10px}
-.small-btn.delete{color:var(--red)}
-.empty{text-align:center;color:#858a9b;font-size:12px;padding:25px;line-height:1.7}
+.empty{text-align:center;color:#858a9d;padding:24px 12px;font-size:12px;line-height:1.7}
 .spinner{
-    width:15px;height:15px;border:2px solid rgba(255,255,255,.25);
-    border-top-color:#fff;border-radius:50%;display:inline-block;
-    animation:spin .7s linear infinite;vertical-align:middle;margin-right:7px
+    display:inline-block;width:14px;height:14px;margin-right:7px;
+    border:2px solid #ffffff55;border-top-color:white;border-radius:50%;
+    animation:spin .7s linear infinite;vertical-align:middle
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-footer{text-align:center;color:#666b7c;font-size:10px;margin-top:45px}
-@media(max-width:650px){
-    .container{width:94%;padding-top:20px}
-    header{margin-bottom:40px}
-    .card{padding:18px;border-radius:19px}
+footer{text-align:center;color:#686d7e;font-size:10px;margin-top:42px}
+@media(max-width:600px){
+    .container{padding-top:20px}
+    header{margin-bottom:38px}
+    .logo{font-size:18px}
+    .card{padding:18px;border-radius:18px}
     .input-wrap{flex-direction:column}
-    .analyze{height:48px}
-    h1{letter-spacing:-2px}
+    .analyze{height:46px}
+    h1{letter-spacing:-1.8px}
     .app{align-items:flex-start;flex-direction:column}
     .app-actions{width:100%}
     .small-btn{flex:1}
@@ -149,62 +153,68 @@ footer{text-align:center;color:#666b7c;font-size:10px;margin-top:45px}
     </div>
     <div class="status">
         <span id="statusDot" class="dot"></span>
-        <span id="statusText">Checking backend...</span>
+        <span id="statusText">Connecting...</span>
     </div>
 </header><section class="hero">
-    <div class="badge">PUBLIC GITHUB DEPLOYMENT</div>
+    <div class="badge">GITHUB TO HEROKU DEPLOYMENT</div>
     <h1>Deploy your bot<br><span class="gradient">in seconds.</span></h1>
     <p>
-        Weka public GitHub repository URL. Mini Heroku itasoma
-        repository yako, itagundua environment variables na
-        ku-deploy kwenye Heroku Team yako.
+        Unganisha public GitHub repository yako, kagua environment
+        variables, kisha deploy kwenye Heroku Team yako.
     </p>
-</section><div class="card">
+</section><section class="card">
     <div class="card-title">GitHub Repository</div>
-    <div class="card-subtitle">Public repositories only</div>
+    <div class="card-subtitle">Ingiza URL kamili ya public GitHub repository.</div><form id="repoForm" novalidate>
     <label for="repoUrl">Repository URL</label>
     <div class="input-wrap">
-        <input id="repoUrl" type="url"
+        <input
+            id="repoUrl"
+            name="repoUrl"
+            type="url"
             placeholder="https://github.com/username/my-bot"
-            autocomplete="off">
-        <button id="analyzeBtn" class="analyze" type="button"
-            onclick="analyzeRepository()">Analyze</button>
-    </div><div id="repoInfo" class="repo-info">
+            autocomplete="url"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+        >
+        <button id="analyzeBtn" class="analyze" type="submit">Analyze</button>
+    </div>
+</form>
+
+<div id="repoInfo" class="repo-info">
     <div id="repoName" class="repo-name"></div>
     <div id="repoDescription" class="repo-description"></div>
     <div id="repoMeta" class="meta"></div>
 </div>
-<div id="message" class="message" role="status"></div>
 
-</div><div id="envCard" class="card">
+<div id="message" class="message" role="status" aria-live="polite"></div>
+
+</section><section id="envCard" class="card">
     <div class="card-title">Environment Variables</div>
     <div class="card-subtitle">
-        Kagua na ujaze values zinazohitajika kabla ya deployment.
+        Jaza taarifa zinazohitajika na repository yako kabla ya deployment.
     </div>
     <div id="envList"></div>
-    <button id="deployBtn" class="deploy" type="button"
-        onclick="deployRepository()">🚀 Deploy to Heroku</button>
-</div><div id="logsCard" class="card">
+    <button id="deployBtn" class="deploy" type="button">🚀 Deploy to Heroku</button>
+</section><section id="logsCard" class="card">
     <div class="card-title">Deployment Logs</div>
-    <div class="card-subtitle">Deployment progress kutoka Mini Heroku</div>
+    <div class="card-subtitle">Maendeleo na matokeo ya deployment.</div>
     <div id="logs" class="logs" aria-live="polite"></div>
-</div><section class="apps">
+</section><section class="apps">
     <div class="apps-heading">
         <div class="apps-title">Your Team Apps</div>
-        <button class="refresh-btn" type="button" onclick="loadApps()">↻ Refresh</button>
+        <button id="refreshAppsBtn" class="refresh-btn" type="button">↻ Refresh</button>
     </div>
-    <div id="appsList"><div class="empty">Loading apps...</div></div>
-</section><footer>Mini Heroku • GitHub → Heroku Team</footer>
+    <div id="appsList"><div class="empty">Loading Team apps...</div></div>
+</section><footer>Mini Heroku · GitHub → Heroku Team</footer>
 </div><script>
 "use strict";
 
-let currentAnalysis = null;
-let currentDeployment = null;
-let activeEventSource = null;
-let pollTimer = null;
-
+/* DOM ELEMENTS */
 const $ = id => document.getElementById(id);
-const repoUrl = $("repoUrl");
+
+const repoForm = $("repoForm");
+const repoInput = $("repoUrl");
 const analyzeBtn = $("analyzeBtn");
 const deployBtn = $("deployBtn");
 const envCard = $("envCard");
@@ -214,136 +224,221 @@ const logsCard = $("logsCard");
 const logs = $("logs");
 const message = $("message");
 
+let currentAnalysis = null;
+let currentDeployment = null;
+let activeEventSource = null;
+
+/* MESSAGE */
 function showMessage(text, type = "error") {
     message.textContent = String(text || "Unknown error");
     message.className = "message show " + type;
 }
+
 function hideMessage() {
+    message.textContent = "";
     message.className = "message";
 }
-function setBackendStatus(online, label) {
-    $("statusDot").classList.toggle("online", Boolean(online));
-    $("statusText").textContent = label;
-}
+
+/* SAFE RESPONSE PARSER */
 async function readResponse(response) {
-    const text = await response.text();
-    let data;
+    const raw = await response.text();
+    let data = {};
+
     try {
-        data = text ? JSON.parse(text) : {};
+        data = raw ? JSON.parse(raw) : {};
     } catch {
-        throw new Error("Server ilirudisha response isiyo sahihi (HTTP " + response.status + ").");
+        throw new Error(
+            "Server imerudisha response isiyo JSON. HTTP " + response.status
+        );
     }
+
     if (!response.ok) {
-        throw new Error(data.error || data.message || ("HTTP " + response.status));
+        throw new Error(
+            data.error || data.message || "HTTP " + response.status
+        );
     }
+
     return data;
 }
 
-/* HEALTH: /api/health returns {ok:true}, not necessarily success/configured */
+/* HEALTH CHECK */
 async function checkHealth() {
+    const dot = $("statusDot");
+    const text = $("statusText");
+
     try {
-        const response = await fetch("/api/health", {cache:"no-store"});
+        const response = await fetch("/api/health", {
+            cache: "no-store"
+        });
+
         const data = await readResponse(response);
 
         if (data.ok === true || data.success === true || data.status === "ok") {
-            setBackendStatus(true, "Backend Online");
+            dot.classList.add("online");
+            text.textContent = "Backend Online";
         } else {
-            setBackendStatus(false, "Backend Responded");
-            console.warn("Health response:", data);
+            dot.classList.remove("online");
+            text.textContent = "Backend Responded";
+            console.log("Health response:", data);
         }
     } catch (error) {
-        setBackendStatus(false, "Connection Failed");
-        console.error("Health check failed:", error);
+        dot.classList.remove("online");
+        text.textContent = "Connection Failed";
+        console.error("Health check:", error);
     }
 }
 
-/* ANALYZE REPOSITORY */
-async function analyzeRepository() {
-const input = document.getElementById("repoUrl");
-const url = input ? input.value.trim() : "";
+/* NORMALIZE AND VALIDATE GITHUB URL */
+function normalizeRepositoryUrl(value) {
+    let url = String(value || "").trim();
 
-console.log("Repository URL entered:", url);
+    /* Ondoa spaces zilizobandikwa kwa bahati mbaya */
+    url = url.replace(/\s+/g, "");
 
-if (!url) {
-    showMessage("Weka GitHub repository URL kwanza.");
-    if (input) input.focus();
-    return;
+    if (!url) return "";
+
+    /* Kubali URL iliyoandikwa bila https:// */
+    if (/^github\.com\//i.test(url)) {
+        url = "https://" + url;
+    }
+
+    return url.replace(/\/+$/, "");
 }
 
-if (!/^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/?#]+\/?$/i.test(url)) {
-    showMessage(
-        "URL si sahihi. Mfano: https://github.com/siladata2/Tyrex-bot"
-    );
-    return;
-}
+/* ANALYZE FORM */
+repoForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
 
-hideMessage();
-analyzeBtn.disabled = true;
-analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing';
+    /*
+      Soma thamani moja kwa moja kutoka input.
+      Hii huepusha kutegemea variable ya zamani.
+    */
+    const url = normalizeRepositoryUrl(repoInput.value);
 
-envCard.classList.remove("show");
-repoInfo.classList.remove("show");
-currentAnalysis = null;
+    console.log("[Mini Heroku] Repository input:", JSON.stringify(url));
 
-try {
-    const response = await fetch("/api/repository/analyze", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            repo: url.replace(/\/+$/, "")
-        })
-    });
+    if (!url) {
+        showMessage("Weka GitHub repository URL kwanza.");
+        repoInput.focus();
+        return;
+    }
 
-    const data = await readResponse(response);
+    let parsedUrl;
 
-    if (!response.ok || data.success === false) {
-        throw new Error(
-            data.error || "Repository analysis imeshindwa."
+    try {
+        parsedUrl = new URL(url);
+    } catch {
+        showMessage("URL si sahihi. Tumia https://github.com/username/repository");
+        repoInput.focus();
+        return;
+    }
+
+    if (
+        parsedUrl.hostname.toLowerCase() !== "github.com" &&
+        parsedUrl.hostname.toLowerCase() !== "www.github.com"
+    ) {
+        showMessage("Tumia URL ya github.com.");
+        repoInput.focus();
+        return;
+    }
+
+    const parts = parsedUrl.pathname.split("/").filter(Boolean);
+
+    if (parts.length !== 2) {
+        showMessage("Weka URL ya repository, mfano https://github.com/siladata2/Tyrex-bot");
+        repoInput.focus();
+        return;
+    }
+
+    hideMessage();
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing';
+
+    currentAnalysis = null;
+    envCard.classList.remove("show");
+    repoInfo.classList.remove("show");
+
+    try {
+        const response = await fetch("/api/repository/analyze", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ repo: url })
+        });
+
+        const data = await readResponse(response);
+
+        if (data.success === false) {
+            throw new Error(data.error || "Repository analysis failed.");
+        }
+
+        if (!data.repository || !data.app) {
+            console.error("Unexpected analyze response:", data);
+            throw new Error(
+                "Backend haijarudisha repository/app data inayotarajiwa. Kagua server.js."
+            );
+        }
+
+        currentAnalysis = data;
+
+        renderRepository(data);
+        renderEnvironment(data);
+
+        showMessage(
+            "Repository imepatikana! Kagua environment variables kabla ya deploy.",
+            "success"
         );
+
+    } catch (error) {
+        console.error("[Mini Heroku] Analyze failed:", error);
+        showMessage(error.message || "Imeshindikana kuchambua repository.");
+    } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = "Analyze";
     }
+});
 
-    if (!data.repository || !data.app) {
-        console.error("Unexpected server response:", data);
-        throw new Error(
-            "Server haijarudisha repository na app data inayotarajiwa."
-        );
-    }
+/* REPOSITORY DETAILS */
+function renderRepository(data) {
+    const repo = data.repository || {};
+    const app = data.app || {};
 
-    currentAnalysis = data;
+    $("repoName").textContent =
+        repo.full_name || repo.name || "GitHub Repository";
 
-    renderRepository(data);
-    renderEnvironment(data);
+    $("repoDescription").textContent =
+        repo.description || "No repository description.";
 
-    showMessage(
-        "Repository imepatikana! Kagua environment variables kabla ya deploy.",
-        "success"
-    );
+    const meta = $("repoMeta");
+    meta.replaceChildren();
 
-} catch (error) {
-    console.error("Repository analysis error:", error);
+    addMeta(meta, "Branch: " + (repo.branch || "default"));
+    addMeta(meta, "Runtime: " + (app.runtime || "Unknown"));
 
-    showMessage(
-        error.message || "Imeshindikana kusoma repository."
-    );
+    if (app.hasAppJson) addMeta(meta, "app.json ✓");
+    if (app.hasProcfile) addMeta(meta, "Procfile ✓");
+    if (app.hasPackageJson) addMeta(meta, "package.json ✓");
 
-} finally {
-    analyzeBtn.disabled = false;
-    analyzeBtn.textContent = "Analyze";
+    repoInfo.classList.add("show");
 }
 
+function addMeta(parent, text) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    parent.appendChild(span);
 }
-    
-/*ENVIRONMENT VARIABLES */
+
+/* ENVIRONMENT VARIABLES */
 function renderEnvironment(data) {
     const env = Array.isArray(data.app.env) ? data.app.env : [];
     envList.replaceChildren();
 
-    if (!env.length) {
+    if (env.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.textContent = "Hakuna environment variables zilizotambuliwa kwenye app.json. Unaweza kuendelea ikiwa app yako haihitaji.";
+        empty.textContent =
+            "Hakuna environment variables zilizotambuliwa. Ikiwa bot yako inahitaji API keys au credentials, hakikisha zinapatikana kwenye app.json au zinaungwa mkono na backend.";
         envList.appendChild(empty);
         envCard.classList.add("show");
         return;
@@ -375,10 +470,10 @@ function renderEnvironment(data) {
         input.className = "env-input";
         input.dataset.envKey = item.key || "";
         input.type = "password";
-        input.placeholder = item.required ? "Enter required value..." : "Optional";
-        input.value = item.value || "";
         input.autocomplete = "off";
         input.spellcheck = false;
+        input.placeholder = item.required ? "Enter required value..." : "Optional";
+        input.value = item.value || "";
 
         row.append(header, description, input);
         envList.appendChild(row);
@@ -387,48 +482,61 @@ function renderEnvironment(data) {
     envCard.classList.add("show");
 }
 
+/* COLLECT ENVIRONMENT VALUES */
 function collectEnvironment() {
     const values = {};
+
     document.querySelectorAll("[data-env-key]").forEach(input => {
         values[input.dataset.envKey] = input.value;
     });
+
     return values;
 }
 
 /* DEPLOY */
-async function deployRepository() {
+deployBtn.addEventListener("click", async function() {
     if (!currentAnalysis) {
         showMessage("Analyze repository kwanza.");
+        repoInput.focus();
         return;
     }
 
     const env = collectEnvironment();
-    const envDefinitions = Array.isArray(currentAnalysis.app.env)
-        ? currentAnalysis.app.env : [];
+    const definitions = Array.isArray(currentAnalysis.app.env)
+        ? currentAnalysis.app.env
+        : [];
 
-    const missing = envDefinitions.filter(item =>
+    const missing = definitions.filter(item =>
         item.required && !String(env[item.key] || "").trim()
     );
 
     if (missing.length) {
-        showMessage("Jaza required variables: " + missing.map(item => item.key).join(", "));
+        showMessage(
+            "Jaza required variables: " +
+            missing.map(item => item.key).join(", ")
+        );
         return;
     }
 
-    const repositoryUrl = currentAnalysis.repository.url || repoUrl.value.trim();
+    const repo = currentAnalysis.repository.url ||
+        normalizeRepositoryUrl(repoInput.value);
 
     deployBtn.disabled = true;
     deployBtn.innerHTML = '<span class="spinner"></span>Starting deployment';
+
     logsCard.classList.add("show");
     logs.replaceChildren();
     appendLog("[Mini Heroku] Inaanzisha deployment...");
 
     try {
         const response = await fetch("/api/deploy", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({repo:repositoryUrl, env})
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ repo, env })
         });
+
         const data = await readResponse(response);
 
         if (data.success === false) {
@@ -436,31 +544,36 @@ async function deployRepository() {
         }
 
         currentDeployment = data.deploymentId || data.id;
+
         if (!currentDeployment) {
-            throw new Error("Server haikurudisha deployment ID.");
+            throw new Error("Backend haikurudisha deployment ID.");
         }
 
         appendLog("[Mini Heroku] Deployment ID: " + currentDeployment);
         connectLogs(currentDeployment);
+
     } catch (error) {
+        console.error("Deploy error:", error);
         appendLog("[ERROR] " + error.message, true);
         showMessage(error.message);
         deployBtn.disabled = false;
         deployBtn.textContent = "🚀 Try Again";
     }
-}
+});
 
-/* LIVE DEPLOYMENT LOGS */
+/* DEPLOYMENT LOGS */
 function connectLogs(deploymentId) {
-    if (activeEventSource) activeEventSource.close();
-    if (pollTimer) clearInterval(pollTimer);
+    if (activeEventSource) {
+        activeEventSource.close();
+    }
 
     const source = new EventSource(
         "/api/deploy/" + encodeURIComponent(deploymentId) + "/logs"
     );
+
     activeEventSource = source;
 
-    source.onmessage = event => {
+    source.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
 
@@ -476,44 +589,50 @@ function connectLogs(deploymentId) {
                     appendLog("✓ DEPLOYMENT SUCCESS", false, true);
                     deployBtn.disabled = false;
                     deployBtn.textContent = "🚀 Deploy Again";
+
                     showMessage("Deployment imekamilika successfully.", "success");
                     loadApps();
                 } else {
                     appendLog("✗ DEPLOYMENT FAILED", true);
-                    if (data.error) appendLog(data.error, true);
+
+                    if (data.error) {
+                        appendLog(data.error, true);
+                    }
+
                     deployBtn.disabled = false;
                     deployBtn.textContent = "🚀 Try Again";
                     showMessage(data.error || "Deployment imeshindwa.");
                 }
             }
         } catch (error) {
-            appendLog("Log parsing error: " + error.message, true);
+            appendLog("Log error: " + error.message, true);
         }
     };
 
-    source.onerror = () => {
-        /* Usifunge connection mapema; browser itajaribu kuunganisha tena. */
+    source.onerror = function() {
         console.warn("Deployment log connection interrupted.");
     };
 }
 
-function appendLog(text, error = false, success = false) {
+function appendLog(text, isError = false, isSuccess = false) {
     const line = document.createElement("div");
     line.className = "log-line";
-    if (error) line.classList.add("error-text");
-    if (success) line.classList.add("success-text");
+
+    if (isError) line.classList.add("error-text");
+    if (isSuccess) line.classList.add("success-text");
+
     line.textContent = String(text ?? "");
     logs.appendChild(line);
     logs.scrollTop = logs.scrollHeight;
 }
 
-/* TEAM APPS */
+/* LOAD TEAM APPS */
 async function loadApps() {
     const list = $("appsList");
-    list.innerHTML = '<div class="empty"><span class="spinner"></span>Loading Team apps...</div>';
+    list.innerHTML = '<div class="empty">Loading Team apps...</div>';
 
     try {
-        const response = await fetch("/api/apps", {cache:"no-store"});
+        const response = await fetch("/api/apps", { cache: "no-store" });
         const data = await readResponse(response);
 
         if (data.success === false) {
@@ -522,8 +641,9 @@ async function loadApps() {
 
         const apps = Array.isArray(data.apps) ? data.apps : [];
 
-        if (!apps.length) {
-            list.innerHTML = '<div class="empty">Hakuna apps zilizopatikana kwenye Team yako bado.</div>';
+        if (apps.length === 0) {
+            list.innerHTML =
+                '<div class="empty">Hakuna apps zilizopatikana kwenye Team yako.</div>';
             return;
         }
 
@@ -534,14 +654,16 @@ async function loadApps() {
             row.className = "app";
 
             const info = document.createElement("div");
+
             const name = document.createElement("div");
             name.className = "app-name";
             name.textContent = app.name || "Unnamed app";
 
             const meta = document.createElement("div");
             meta.className = "app-meta";
-            meta.textContent = (app.region && app.region.name ? app.region.name : "Heroku")
-                + (app.web_url ? " • " + app.web_url : "");
+            meta.textContent =
+                (app.region && app.region.name ? app.region.name : "Heroku") +
+                (app.web_url ? " · " + app.web_url : "");
 
             info.append(name, meta);
 
@@ -564,13 +686,17 @@ async function loadApps() {
             row.append(info, actions);
             list.appendChild(row);
         });
+
     } catch (error) {
-        list.replaceChildren();
-        const box = document.createElement("div");
-        box.className = "empty";
-        box.textContent = "Imeshindikana kupakia apps: " + error.message;
-        list.appendChild(box);
         console.error("Load apps error:", error);
+
+        list.replaceChildren();
+
+        const errorBox = document.createElement("div");
+        errorBox.className = "empty";
+        errorBox.textContent = "Imeshindikana kupakia apps: " + error.message;
+
+        list.appendChild(errorBox);
     }
 }
 
@@ -581,12 +707,16 @@ async function restartApp(name) {
     try {
         const response = await fetch(
             "/api/apps/" + encodeURIComponent(name) + "/restart",
-            {method:"POST"}
+            { method: "POST" }
         );
+
         const data = await readResponse(response);
 
-        if (data.success === false) throw new Error(data.error || "Restart failed.");
-        alert(name + " restart request imetumwa.");
+        if (data.success === false) {
+            throw new Error(data.error || "Restart failed.");
+        }
+
+        alert("Restart request imetumwa kwa " + name + ".");
     } catch (error) {
         alert("Restart failed: " + error.message);
     }
@@ -599,28 +729,30 @@ async function deleteApp(name) {
     try {
         const response = await fetch(
             "/api/apps/" + encodeURIComponent(name),
-            {method:"DELETE"}
+            { method: "DELETE" }
         );
+
         const data = await readResponse(response);
 
-        if (data.success === false) throw new Error(data.error || "Delete failed.");
+        if (data.success === false) {
+            throw new Error(data.error || "Delete failed.");
+        }
+
         showMessage(name + " imefutwa.", "success");
         loadApps();
+
     } catch (error) {
         alert("Delete failed: " + error.message);
     }
 }
 
-/* ENTER KEY */
-repoUrl.addEventListener("keydown", event => {
-    if (event.key === "Enter") analyzeRepository();
-});
+/* REFRESH BUTTON */
+$("refreshAppsBtn").addEventListener("click", loadApps);
 
 /* START */
 checkHealth();
 loadApps();
-
-/* Refresh backend status occasionally */
 setInterval(checkHealth, 30000);
+
 </script></body>
 </html>
