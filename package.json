@@ -1,7 +1,7 @@
 {
   "name": "mini-heroku",
-  "version": "2.0.0",
-  "description": "Mini Heroku Git Repository Deployment Platform",
+  "version": "3.0.0",
+  "description": "Mini Heroku public GitHub repository deployment platform",
   "type": "module",
   "scripts": {
     "start": "node server.js"
