@@ -2,983 +2,679 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Mini Heroku</title>
 
 <style>
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
 }
 
-body {
-    font-family:
-        Inter,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-
+body{
+    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     background:
-        radial-gradient(
-            circle at top left,
-            #18233d,
-            #080b12 45%,
-            #05070b
-        );
-
-    color: #fff;
-    min-height: 100vh;
+        radial-gradient(circle at 20% 10%,rgba(120,80,255,.18),transparent 30%),
+        radial-gradient(circle at 90% 20%,rgba(0,210,255,.12),transparent 30%),
+        #070812;
+    color:#fff;
+    min-height:100vh;
 }
 
-.container {
-    width: min(1100px, 94%);
-    margin: auto;
-    padding: 25px 0 60px;
+.container{
+    width:min(1050px,92%);
+    margin:auto;
+    padding:35px 0 70px;
 }
 
-
-/* HEADER */
-
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 45px;
+header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:55px;
 }
 
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.logo{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:21px;
+    font-weight:800;
 }
 
-.logo-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background:
-        linear-gradient(
-            135deg,
-            #6d5dfc,
-            #9f7aea
-        );
-
-    font-size: 21px;
-    font-weight: 900;
-
-    box-shadow:
-        0 10px 30px
-        rgba(109,93,252,.3);
+.logo-box{
+    width:40px;
+    height:40px;
+    border-radius:12px;
+    display:grid;
+    place-items:center;
+    background:linear-gradient(135deg,#7657ff,#22d3ee);
+    box-shadow:0 0 30px rgba(118,87,255,.35);
 }
 
-.logo h1 {
-    font-size: 20px;
+.status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 13px;
+    border:1px solid rgba(255,255,255,.08);
+    background:rgba(255,255,255,.04);
+    border-radius:30px;
+    font-size:12px;
+    color:#aaa;
 }
 
-.logo span {
-    display: block;
-    color: #8993a7;
-    font-size: 12px;
-    margin-top: 2px;
+.dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#777;
 }
 
-.connection {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    padding: 8px 13px;
-    border-radius: 20px;
-
-    background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.08);
-
-    font-size: 12px;
-    color: #aeb7c8;
+.dot.online{
+    background:#27e38a;
+    box-shadow:0 0 12px #27e38a;
 }
 
-.dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ff4d6d;
+.hero{
+    text-align:center;
+    margin-bottom:35px;
 }
 
-.dot.online {
-    background: #39e58c;
-    box-shadow: 0 0 12px #39e58c;
+.badge{
+    display:inline-block;
+    padding:7px 13px;
+    border-radius:30px;
+    background:rgba(118,87,255,.1);
+    border:1px solid rgba(118,87,255,.25);
+    color:#b8aaff;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.5px;
+    margin-bottom:18px;
 }
 
-
-/* HERO */
-
-.hero {
-    margin-bottom: 28px;
+h1{
+    font-size:clamp(38px,7vw,70px);
+    line-height:1;
+    letter-spacing:-3px;
+    margin-bottom:18px;
 }
 
-.hero h2 {
-    font-size: clamp(32px, 6vw, 55px);
-    line-height: 1.05;
-    letter-spacing: -2px;
+.gradient{
+    background:linear-gradient(90deg,#fff,#a995ff,#48dfff);
+    -webkit-background-clip:text;
+    color:transparent;
 }
 
-.hero h2 span {
-    background:
-        linear-gradient(
-            90deg,
-            #8b7cff,
-            #d19cff
-        );
-
-    -webkit-background-clip: text;
-    color: transparent;
+.hero p{
+    max-width:600px;
+    margin:auto;
+    color:#9296a8;
+    line-height:1.7;
+    font-size:15px;
 }
 
-.hero p {
-    margin-top: 14px;
-    max-width: 650px;
-    color: #8f9aae;
-    line-height: 1.7;
+.card{
+    background:rgba(15,17,30,.75);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:24px;
+    padding:25px;
+    backdrop-filter:blur(18px);
+    box-shadow:0 20px 70px rgba(0,0,0,.25);
+    margin-bottom:22px;
 }
 
-
-/* GRID */
-
-.grid {
-    display: grid;
-    grid-template-columns:
-        minmax(0, 1.4fr)
-        minmax(280px, .8fr);
-
-    gap: 20px;
+.card-title{
+    font-size:16px;
+    font-weight:800;
+    margin-bottom:7px;
 }
 
-
-/* CARD */
-
-.card {
-    background:
-        rgba(13,17,27,.78);
-
-    border:
-        1px solid
-        rgba(255,255,255,.07);
-
-    border-radius: 22px;
-
-    padding: 24px;
-
-    box-shadow:
-        0 20px 60px
-        rgba(0,0,0,.25);
-
-    backdrop-filter:
-        blur(20px);
+.card-subtitle{
+    color:#7f8497;
+    font-size:12px;
+    margin-bottom:20px;
 }
 
-.card-title {
-    font-size: 18px;
-    font-weight: 700;
+label{
+    display:block;
+    color:#9da2b4;
+    font-size:12px;
+    margin-bottom:8px;
 }
 
-.card-subtitle {
-    color: #7f899d;
-    font-size: 13px;
-    margin-top: 6px;
-    margin-bottom: 24px;
+.input-wrap{
+    display:flex;
+    gap:10px;
 }
 
-
-/* FORM */
-
-.field {
-    margin-bottom: 17px;
+input{
+    width:100%;
+    border:none;
+    outline:none;
+    color:#fff;
+    background:#0a0c17;
+    border:1px solid #202335;
+    border-radius:13px;
+    padding:15px;
+    font-size:14px;
+    transition:.2s;
 }
 
-label {
-    display: block;
-    color: #b7c0d0;
-    font-size: 13px;
-    margin-bottom: 8px;
+input:focus{
+    border-color:#725cff;
+    box-shadow:0 0 0 3px rgba(114,92,255,.1);
 }
 
-input,
-select {
-    width: 100%;
-
-    padding: 13px 14px;
-
-    border-radius: 12px;
-
-    border:
-        1px solid
-        rgba(255,255,255,.08);
-
-    background:
-        rgba(255,255,255,.035);
-
-    color: #fff;
-
-    outline: none;
-
-    transition: .2s;
+button{
+    border:none;
+    cursor:pointer;
+    color:#fff;
+    font-weight:800;
+    border-radius:13px;
+    transition:.2s;
 }
 
-input:focus,
-select:focus {
-    border-color: #7465ff;
-
-    box-shadow:
-        0 0 0 3px
-        rgba(116,101,255,.1);
+button:disabled{
+    opacity:.45;
+    cursor:not-allowed;
 }
 
-input::placeholder {
-    color: #596275;
+.analyze{
+    padding:0 22px;
+    background:linear-gradient(135deg,#7657ff,#5940dc);
+    box-shadow:0 10px 30px rgba(118,87,255,.22);
+    white-space:nowrap;
 }
 
-
-/* ENV */
-
-.env-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+.deploy{
+    width:100%;
+    padding:16px;
+    background:linear-gradient(135deg,#7657ff,#22aeea);
+    margin-top:20px;
+    font-size:14px;
 }
 
-.env-header label {
-    margin: 0;
+button:hover:not(:disabled){
+    transform:translateY(-1px);
+    filter:brightness(1.08);
 }
 
-.add-env {
-    border: 0;
-    background: transparent;
-    color: #9b8cff;
-    cursor: pointer;
-    font-size: 13px;
+.repo-info{
+    display:none;
+    margin-top:22px;
+    padding:18px;
+    border-radius:16px;
+    background:#0a0c17;
+    border:1px solid #202335;
 }
 
-.env-row {
-    display: grid;
-    grid-template-columns:
-        1fr 1.3fr 40px;
-
-    gap: 8px;
-
-    margin-bottom: 8px;
+.repo-info.show{
+    display:block;
 }
 
-.remove-env {
-    border: 0;
-    border-radius: 10px;
-
-    background:
-        rgba(255,70,100,.08);
-
-    color: #ff7189;
-
-    cursor: pointer;
+.repo-name{
+    font-weight:800;
+    margin-bottom:6px;
 }
 
-
-/* BUTTON */
-
-.deploy-btn {
-    width: 100%;
-
-    margin-top: 10px;
-
-    padding: 14px;
-
-    border: 0;
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            #6858f5,
-            #9277ff
-        );
-
-    color: white;
-
-    font-weight: 800;
-    font-size: 14px;
-
-    cursor: pointer;
-
-    box-shadow:
-        0 12px 30px
-        rgba(104,88,245,.25);
-
-    transition: .2s;
+.repo-description{
+    color:#777d90;
+    font-size:12px;
+    line-height:1.5;
 }
 
-.deploy-btn:hover {
-    transform: translateY(-1px);
+.meta{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:14px;
 }
 
-.deploy-btn:disabled {
-    opacity: .55;
-    cursor: not-allowed;
+.meta span{
+    padding:6px 9px;
+    border-radius:8px;
+    background:#151827;
+    color:#9fa4b5;
+    font-size:10px;
 }
 
-
-/* STATUS */
-
-.status {
-    margin-top: 18px;
-
-    display: none;
-
-    padding: 13px 15px;
-
-    border-radius: 12px;
-
-    background:
-        rgba(255,255,255,.04);
-
-    border:
-        1px solid
-        rgba(255,255,255,.07);
-
-    color: #aeb7c8;
-
-    font-size: 13px;
-
-    line-height: 1.6;
+#envCard{
+    display:none;
 }
 
-.status.show {
-    display: block;
+#envCard.show{
+    display:block;
 }
 
-.status.success {
-    border-color:
-        rgba(57,229,140,.25);
-
-    color: #72efae;
+.env-row{
+    margin-bottom:15px;
 }
 
-.status.error {
-    border-color:
-        rgba(255,77,109,.25);
-
-    color: #ff8195;
+.env-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
 }
 
-
-/* STATS */
-
-.stats {
-    display: grid;
-    grid-template-columns:
-        repeat(3, 1fr);
-
-    gap: 12px;
-
-    margin-bottom: 20px;
+.required{
+    color:#ff7891;
+    font-size:9px;
+    font-weight:800;
 }
 
-.stat {
-    padding: 18px;
-
-    border-radius: 17px;
-
-    background:
-        rgba(255,255,255,.035);
-
-    border:
-        1px solid
-        rgba(255,255,255,.06);
+.env-description{
+    color:#686e81;
+    font-size:10px;
+    margin:5px 0 8px;
 }
 
-.stat small {
-    color: #717c90;
-    font-size: 11px;
+.env-input{
+    width:100%;
 }
 
-.stat strong {
-    display: block;
-
-    font-size: 25px;
-
-    margin-top: 7px;
+.message{
+    display:none;
+    margin-top:15px;
+    padding:13px;
+    border-radius:12px;
+    font-size:12px;
+    line-height:1.5;
 }
 
-
-/* APPS */
-
-.apps-card {
-    margin-top: 20px;
+.message.show{
+    display:block;
 }
 
-.apps-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    margin-bottom: 15px;
+.message.error{
+    color:#ff9bad;
+    background:rgba(255,70,100,.08);
+    border:1px solid rgba(255,70,100,.15);
 }
 
-.refresh {
-    border: 0;
-    background: transparent;
-    color: #9b8cff;
-    cursor: pointer;
+.message.success{
+    color:#75e7ae;
+    background:rgba(39,227,138,.07);
+    border:1px solid rgba(39,227,138,.13);
 }
 
-.app-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 15px;
-
-    padding: 15px;
-
-    margin-bottom: 9px;
-
-    border-radius: 14px;
-
-    background:
-        rgba(255,255,255,.035);
-
-    border:
-        1px solid
-        rgba(255,255,255,.05);
+#logsCard{
+    display:none;
 }
 
-.app-name {
-    font-weight: 700;
+#logsCard.show{
+    display:block;
 }
 
-.app-url {
-    color: #687489;
-    font-size: 11px;
-    margin-top: 4px;
+.logs{
+    height:320px;
+    overflow:auto;
+    padding:17px;
+    background:#05060b;
+    border:1px solid #181b28;
+    border-radius:15px;
+    font-family:monospace;
+    font-size:11px;
+    line-height:1.7;
+    color:#aeb3c4;
+    white-space:pre-wrap;
 }
 
-.app-actions {
-    display: flex;
-    gap: 7px;
+.log-line{
+    border-bottom:1px solid rgba(255,255,255,.025);
+    padding:2px 0;
 }
 
-.app-actions button {
-    border: 0;
-
-    padding: 8px 10px;
-
-    border-radius: 9px;
-
-    cursor: pointer;
-
-    color: #cbd3e2;
-
-    background:
-        rgba(255,255,255,.06);
+.success-text{
+    color:#4de49a;
 }
 
-.app-actions .delete {
-    color: #ff7189;
+.error-text{
+    color:#ff6e88;
 }
 
-.empty {
-    text-align: center;
-
-    padding: 35px 10px;
-
-    color: #687489;
-
-    font-size: 13px;
+.apps{
+    margin-top:35px;
 }
 
+.apps-title{
+    font-size:20px;
+    font-weight:800;
+    margin-bottom:15px;
+}
 
-/* MOBILE */
+.app{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:15px;
+    padding:16px;
+    border:1px solid rgba(255,255,255,.07);
+    background:rgba(255,255,255,.025);
+    border-radius:15px;
+    margin-bottom:9px;
+}
 
-@media (max-width: 760px) {
+.app-name{
+    font-size:13px;
+    font-weight:700;
+}
 
-    .grid {
-        grid-template-columns: 1fr;
+.app-meta{
+    color:#686e80;
+    font-size:10px;
+    margin-top:4px;
+}
+
+.app-actions{
+    display:flex;
+    gap:7px;
+}
+
+.small-btn{
+    padding:8px 11px;
+    background:#171a29;
+    color:#aaaec0;
+    font-size:10px;
+}
+
+.small-btn.delete{
+    color:#ff7189;
+}
+
+.empty{
+    text-align:center;
+    color:#62687a;
+    font-size:12px;
+    padding:25px;
+}
+
+.spinner{
+    width:15px;
+    height:15px;
+    border:2px solid rgba(255,255,255,.25);
+    border-top-color:#fff;
+    border-radius:50%;
+    display:inline-block;
+    animation:spin .7s linear infinite;
+    vertical-align:middle;
+    margin-right:7px;
+}
+
+@keyframes spin{
+    to{transform:rotate(360deg)}
+}
+
+footer{
+    text-align:center;
+    color:#4f5464;
+    font-size:10px;
+    margin-top:45px;
+}
+
+@media(max-width:650px){
+    .container{
+        width:94%;
+        padding-top:20px;
     }
 
-    .stats {
-        grid-template-columns:
-            repeat(3, 1fr);
+    header{
+        margin-bottom:40px;
     }
 
-    .stat {
-        padding: 13px;
+    .card{
+        padding:18px;
+        border-radius:19px;
     }
 
-    .stat strong {
-        font-size: 20px;
+    .input-wrap{
+        flex-direction:column;
     }
 
-    .env-row {
-        grid-template-columns:
-            1fr 1fr 40px;
+    .analyze{
+        height:48px;
     }
 
-    .app-item {
-        align-items: flex-start;
-        flex-direction: column;
+    h1{
+        letter-spacing:-2px;
     }
 
-    .app-actions {
-        width: 100%;
+    .app{
+        align-items:flex-start;
+        flex-direction:column;
     }
 
-    .app-actions button {
-        flex: 1;
+    .app-actions{
+        width:100%;
     }
 
+    .small-btn{
+        flex:1;
+    }
 }
-
 </style>
 </head>
-
 
 <body>
 
 <div class="container">
 
-
-    <!-- HEADER -->
-
-    <header class="header">
-
-        <div class="logo">
-
-            <div class="logo-icon">
-                M
-            </div>
-
-            <div>
-                <h1>Mini Heroku</h1>
-                <span>Bot Deployment Platform</span>
-            </div>
-
-        </div>
-
-
-        <div class="connection">
-
-            <div
-                id="connectionDot"
-                class="dot">
-            </div>
-
-            <span id="connectionText">
-                Connecting...
-            </span>
-
-        </div>
-
-    </header>
-
-
-
-    <!-- HERO -->
-
-    <section class="hero">
-
-        <h2>
-            Deploy your bot
-            <span>instantly.</span>
-        </h2>
-
-        <p>
-            Connect a Git repository, configure your
-            environment variables and deploy your bot
-            directly to your Heroku Team.
-        </p>
-
-    </section>
-
-
-
-    <!-- STATS -->
-
-    <section class="stats">
-
-        <div class="stat">
-            <small>Total Apps</small>
-            <strong id="totalApps">0</strong>
-        </div>
-
-        <div class="stat">
-            <small>Platform</small>
-            <strong>Heroku</strong>
-        </div>
-
-        <div class="stat">
-            <small>Status</small>
-            <strong id="platformStatus">
-                -
-            </strong>
-        </div>
-
-    </section>
-
-
-
-    <div class="grid">
-
-
-        <!-- DEPLOY -->
-
-        <section class="card">
-
-            <div class="card-title">
-                Deploy Repository
-            </div>
-
-            <div class="card-subtitle">
-                Fetch your Git repository and deploy it.
-            </div>
-
-
-            <form id="deployForm">
-
-
-                <div class="field">
-
-                    <label>
-                        Repository URL
-                    </label>
-
-                    <input
-                        id="repo"
-                        type="url"
-                        placeholder="https://github.com/user/my-bot"
-                        required
-                    >
-
-                </div>
-
-
-                <div class="field">
-
-                    <label>
-                        App Name
-                    </label>
-
-                    <input
-                        id="appName"
-                        type="text"
-                        placeholder="my-awesome-bot"
-                    >
-
-                </div>
-
-
-                <div class="field">
-
-                    <label>
-                        Branch
-                    </label>
-
-                    <input
-                        id="branch"
-                        type="text"
-                        value="main"
-                        placeholder="main"
-                    >
-
-                </div>
-
-
-                <div class="field">
-
-                    <label>
-                        Start Command
-                    </label>
-
-                    <input
-                        id="startCommand"
-                        type="text"
-                        placeholder="node bot.js"
-                    >
-
-                </div>
-
-
-                <!-- ENVIRONMENT -->
-
-                <div class="field">
-
-                    <div class="env-header">
-
-                        <label>
-                            Environment Variables
-                        </label>
-
-                        <button
-                            type="button"
-                            class="add-env"
-                            onclick="addEnv()">
-
-                            + Add variable
-
-                        </button>
-
-                    </div>
-
-
-                    <div id="envContainer">
-
-                        <div class="env-row">
-
-                            <input
-                                type="text"
-                                class="env-key"
-                                placeholder="BOT_TOKEN"
-                            >
-
-                            <input
-                                type="password"
-                                class="env-value"
-                                placeholder="Value"
-                            >
-
-                            <button
-                                type="button"
-                                class="remove-env"
-                                onclick="removeEnv(this)">
-
-                                ×
-
-                            </button>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <button
-                    id="deployButton"
-                    class="deploy-btn"
-                    type="submit">
-
-                    🚀 Deploy Bot
-
-                </button>
-
-
-            </form>
-
-
-            <div
-                id="status"
-                class="status">
-            </div>
-
-        </section>
-
-
-
-        <!-- INFO -->
-
-        <section class="card">
-
-            <div class="card-title">
-                How it works
-            </div>
-
-            <div class="card-subtitle">
-                Simple repository deployment.
-            </div>
-
-
-            <div style="
-                color:#8d98aa;
-                font-size:13px;
-                line-height:1.8;
-            ">
-
-                <p>01 — Connect repository</p>
-
-                <p>02 — Detect project</p>
-
-                <p>03 — Configure environment</p>
-
-                <p>04 — Create Heroku app</p>
-
-                <p>05 — Build repository</p>
-
-                <p>06 — Start bot worker</p>
-
-            </div>
-
-        </section>
+<header>
+    <div class="logo">
+        <div class="logo-box">⚡</div>
+        Mini Heroku
+    </div>
+
+    <div class="status">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusText">Connecting...</span>
+    </div>
+</header>
+
+
+<section class="hero">
+    <div class="badge">PUBLIC GITHUB DEPLOYMENT</div>
+
+    <h1>
+        Deploy your bot<br>
+        <span class="gradient">in seconds.</span>
+    </h1>
+
+    <p>
+        Weka public GitHub repository URL.
+        Mini Heroku itaisoma repository yako,
+        itagundua environment variables na
+        kui-deploy moja kwa moja kwenye Heroku Team.
+    </p>
+</section>
+
+
+<div class="card">
+
+    <div class="card-title">
+        GitHub Repository
+    </div>
+
+    <div class="card-subtitle">
+        Public repositories only
+    </div>
+
+    <label>Repository URL</label>
+
+    <div class="input-wrap">
+
+        <input
+            id="repoUrl"
+            type="url"
+            placeholder="https://github.com/username/my-bot"
+            autocomplete="off"
+        >
+
+        <button
+            id="analyzeBtn"
+            class="analyze"
+            onclick="analyzeRepository()"
+        >
+            Analyze
+        </button>
 
     </div>
 
 
+    <div id="repoInfo" class="repo-info">
 
-    <!-- APPS -->
+        <div
+            id="repoName"
+            class="repo-name"
+        ></div>
 
-    <section class="card apps-card">
+        <div
+            id="repoDescription"
+            class="repo-description"
+        ></div>
 
-        <div class="apps-header">
+        <div
+            id="repoMeta"
+            class="meta"
+        ></div>
 
-            <div>
-                <div class="card-title">
-                    Your Apps
-                </div>
+    </div>
 
-                <div
-                    class="card-subtitle"
-                    style="margin-bottom:0">
-
-                    Apps deployed through Mini Heroku
-
-                </div>
-            </div>
-
-
-            <button
-                class="refresh"
-                onclick="loadApps()">
-
-                ↻ Refresh
-
-            </button>
-
-        </div>
-
-
-        <div id="apps">
-
-            <div class="empty">
-                Loading apps...
-            </div>
-
-        </div>
-
-    </section>
-
+    <div
+        id="message"
+        class="message"
+    ></div>
 
 </div>
 
 
+<div
+    id="envCard"
+    class="card"
+>
+
+    <div class="card-title">
+        Environment Variables
+    </div>
+
+    <div class="card-subtitle">
+        Hizi zimepatikana automatically kutoka
+        kwenye app.json ya repository.
+    </div>
+
+    <div id="envList"></div>
+
+    <button
+        id="deployBtn"
+        class="deploy"
+        onclick="deployRepository()"
+    >
+        🚀 Deploy to Heroku
+    </button>
+
+</div>
+
+
+<div
+    id="logsCard"
+    class="card"
+>
+
+    <div class="card-title">
+        Deployment Logs
+    </div>
+
+    <div class="card-subtitle">
+        Live Heroku build output
+    </div>
+
+    <div
+        id="logs"
+        class="logs"
+    ></div>
+
+</div>
+
+
+<section class="apps">
+
+    <div class="apps-title">
+        Your Team Apps
+    </div>
+
+    <div id="appsList">
+        <div class="empty">
+            Loading apps...
+        </div>
+    </div>
+
+</section>
+
+
+<footer>
+    Mini Heroku • GitHub → Heroku Team
+</footer>
+
+</div>
+
 
 <script>
+
+let currentAnalysis = null;
+let currentDeployment = null;
+
 
 /* =========================
    ELEMENTS
 ========================= */
 
-const statusBox =
-    document.getElementById("status");
+const repoUrl =
+    document.getElementById("repoUrl");
 
-const deployButton =
-    document.getElementById("deployButton");
+const analyzeBtn =
+    document.getElementById("analyzeBtn");
+
+const deployBtn =
+    document.getElementById("deployBtn");
+
+const envCard =
+    document.getElementById("envCard");
+
+const envList =
+    document.getElementById("envList");
+
+const repoInfo =
+    document.getElementById("repoInfo");
+
+const logsCard =
+    document.getElementById("logsCard");
+
+const logs =
+    document.getElementById("logs");
+
+const message =
+    document.getElementById("message");
 
 
 /* =========================
-   STATUS
+   MESSAGE
 ========================= */
 
-function showStatus(
-    message,
-    type = ""
-) {
-
-    statusBox.textContent =
-        message;
-
-    statusBox.className =
-        "status show " + type;
-
+function showMessage(
+    text,
+    type = "error"
+){
+    message.textContent = text;
+    message.className =
+        `message show ${type}`;
 }
 
-
-/* =========================
-   ENV VARIABLES
-========================= */
-
-function addEnv() {
-
-    const container =
-        document.getElementById(
-            "envContainer"
-        );
-
-
-    const row =
-        document.createElement(
-            "div"
-        );
-
-    row.className =
-        "env-row";
-
-
-    row.innerHTML = `
-
-        <input
-            type="text"
-            class="env-key"
-            placeholder="KEY"
-        >
-
-        <input
-            type="password"
-            class="env-value"
-            placeholder="Value"
-        >
-
-        <button
-            type="button"
-            class="remove-env"
-            onclick="removeEnv(this)">
-
-            ×
-
-        </button>
-
-    `;
-
-
-    container.appendChild(row);
-
-}
-
-
-function removeEnv(button) {
-
-    const rows =
-        document.querySelectorAll(
-            ".env-row"
-        );
-
-
-    if (rows.length <= 1) {
-
-        return;
-
-    }
-
-
-    button
-        .parentElement
-        .remove();
-
+function hideMessage(){
+    message.className =
+        "message";
 }
 
 
@@ -986,69 +682,309 @@ function removeEnv(button) {
    HEALTH
 ========================= */
 
-async function checkHealth() {
+async function checkHealth(){
 
-    try {
+    try{
+
+        const response =
+            await fetch("/api/health");
+
+        const data =
+            await response.json();
+
+        const dot =
+            document.getElementById(
+                "statusDot"
+            );
+
+        const text =
+            document.getElementById(
+                "statusText"
+            );
+
+        if(data.success && data.configured){
+
+            dot.classList.add("online");
+            text.textContent =
+                "Backend Online";
+
+        }else{
+
+            text.textContent =
+                "Configuration Error";
+        }
+
+    }catch{
+
+        document.getElementById(
+            "statusText"
+        ).textContent =
+            "Offline";
+    }
+}
+
+
+/* =========================
+   ANALYZE
+========================= */
+
+async function analyzeRepository(){
+
+    const url =
+        repoUrl.value.trim();
+
+    if(!url){
+
+        showMessage(
+            "Weka GitHub repository URL kwanza."
+        );
+
+        repoUrl.focus();
+
+        return;
+    }
+
+    hideMessage();
+
+    analyzeBtn.disabled = true;
+
+    analyzeBtn.innerHTML =
+        `<span class="spinner"></span>Analyzing`;
+
+    envCard.classList.remove("show");
+    repoInfo.classList.remove("show");
+
+    try{
 
         const response =
             await fetch(
-                "/api/health"
+                "/api/repository/analyze",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body:JSON.stringify({
+                        repo:url
+                    })
+                }
             );
 
         const data =
             await response.json();
 
+        if(!response.ok || !data.success){
 
-        const dot =
-            document.getElementById(
-                "connectionDot"
+            throw new Error(
+                data.error ||
+                "Repository analysis failed."
             );
-
-        const text =
-            document.getElementById(
-                "connectionText"
-            );
-
-        const platform =
-            document.getElementById(
-                "platformStatus"
-            );
-
-
-        if (
-            data.success &&
-            data.heroku
-        ) {
-
-            dot.classList.add(
-                "online"
-            );
-
-            text.textContent =
-                "Connected";
-
-            platform.textContent =
-                "Online";
-
-        } else {
-
-            text.textContent =
-                "Not connected";
-
-            platform.textContent =
-                "Offline";
-
         }
 
-    } catch {
+        currentAnalysis = data;
 
+        renderRepository(data);
+        renderEnvironment(data);
+
+        showMessage(
+            "Repository imepatikana. Environment variables ziko tayari.",
+            "success"
+        );
+
+    }catch(error){
+
+        currentAnalysis = null;
+
+        showMessage(
+            error.message
+        );
+
+    }finally{
+
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent =
+            "Analyze";
+    }
+}
+
+
+/* =========================
+   REPOSITORY UI
+========================= */
+
+function renderRepository(data){
+
+    const repo =
+        data.repository;
+
+    const app =
+        data.app;
+
+    document.getElementById(
+        "repoName"
+    ).textContent =
+        repo.full_name;
+
+    document.getElementById(
+        "repoDescription"
+    ).textContent =
+        repo.description ||
+        "No repository description.";
+
+    const meta =
         document.getElementById(
-            "connectionText"
-        ).textContent =
-            "Server error";
+            "repoMeta"
+        );
 
+    meta.innerHTML = "";
+
+    addMeta(
+        meta,
+        `Branch: ${repo.branch}`
+    );
+
+    addMeta(
+        meta,
+        `Runtime: ${app.runtime}`
+    );
+
+    if(app.hasAppJson){
+        addMeta(
+            meta,
+            "app.json ✓"
+        );
     }
 
+    if(app.hasProcfile){
+        addMeta(
+            meta,
+            "Procfile ✓"
+        );
+    }
+
+    if(app.hasPackageJson){
+        addMeta(
+            meta,
+            "package.json ✓"
+        );
+    }
+
+    repoInfo.classList.add("show");
+}
+
+
+function addMeta(
+    parent,
+    text
+){
+
+    const span =
+        document.createElement(
+            "span"
+        );
+
+    span.textContent = text;
+
+    parent.appendChild(span);
+}
+
+
+/* =========================
+   ENVIRONMENT
+========================= */
+
+function renderEnvironment(data){
+
+    const env =
+        data.app.env || [];
+
+    envList.innerHTML = "";
+
+    if(!env.length){
+
+        envList.innerHTML = `
+            <div class="empty">
+                Repository hii haina
+                environment variables
+                kwenye app.json.
+            </div>
+        `;
+
+        envCard.classList.add("show");
+
+        return;
+    }
+
+    env.forEach(item => {
+
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.className =
+            "env-row";
+
+        const required =
+            item.required
+                ? `<span class="required">REQUIRED</span>`
+                : "";
+
+        const defaultValue =
+            item.value || "";
+
+        row.innerHTML = `
+            <div class="env-header">
+                <label>${escapeHtml(item.key)}</label>
+                ${required}
+            </div>
+
+            <div class="env-description">
+                ${escapeHtml(
+                    item.description || ""
+                )}
+            </div>
+
+            <input
+                class="env-input"
+                data-env-key="${escapeHtml(item.key)}"
+                type="text"
+                placeholder="${item.required ? "Enter value..." : "Optional"}"
+                value="${escapeHtml(defaultValue)}"
+                autocomplete="off"
+            >
+        `;
+
+        envList.appendChild(row);
+    });
+
+    envCard.classList.add("show");
+}
+
+
+/* =========================
+   COLLECT ENV
+========================= */
+
+function collectEnvironment(){
+
+    const values = {};
+
+    document
+        .querySelectorAll(
+            "[data-env-key]"
+        )
+        .forEach(input => {
+
+            const key =
+                input.dataset.envKey;
+
+            values[key] =
+                input.value;
+        });
+
+    return values;
 }
 
 
@@ -1056,289 +992,341 @@ async function checkHealth() {
    DEPLOY
 ========================= */
 
-document
-    .getElementById("deployForm")
-    .addEventListener(
-        "submit",
-        async event => {
+async function deployRepository(){
 
-            event.preventDefault();
+    if(!currentAnalysis){
 
+        showMessage(
+            "Analyze repository kwanza."
+        );
 
-            const repo =
-                document
-                    .getElementById(
-                        "repo"
-                    )
-                    .value
-                    .trim();
+        return;
+    }
 
+    const env =
+        collectEnvironment();
 
-            const name =
-                document
-                    .getElementById(
-                        "appName"
-                    )
-                    .value
-                    .trim();
-
-
-            const branch =
-                document
-                    .getElementById(
-                        "branch"
-                    )
-                    .value
-                    .trim();
-
-
-            const startCommand =
-                document
-                    .getElementById(
-                        "startCommand"
-                    )
-                    .value
-                    .trim();
-
-
-            const env = {};
-
-
-            document
-                .querySelectorAll(
-                    ".env-row"
-                )
-                .forEach(row => {
-
-                    const key =
-                        row
-                            .querySelector(
-                                ".env-key"
-                            )
-                            .value
-                            .trim();
-
-
-                    const value =
-                        row
-                            .querySelector(
-                                ".env-value"
-                            )
-                            .value;
-
-
-                    if (key) {
-
-                        env[key] =
-                            value;
-
-                    }
-
-                });
-
-
-            deployButton.disabled =
-                true;
-
-
-            deployButton.textContent =
-                "⏳ Deploying...";
-
-
-            showStatus(
-                "Fetching repository and preparing deployment...",
-                ""
+    const required =
+        currentAnalysis.app.env
+            .filter(item =>
+                item.required &&
+                !env[item.key]?.trim()
             );
 
+    if(required.length){
 
-            try {
+        showMessage(
+            "Jaza required variables: " +
+            required
+                .map(item => item.key)
+                .join(", ")
+        );
 
-                const response =
-                    await fetch(
-                        "/api/deploy",
-                        {
-                            method:
-                                "POST",
+        return;
+    }
 
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
+    deployBtn.disabled = true;
 
-                            body:
-                                JSON.stringify({
-                                    repo,
-                                    name,
-                                    branch,
-                                    startCommand,
-                                    env
-                                })
-                        }
-                    );
+    deployBtn.innerHTML =
+        `<span class="spinner"></span>Starting deployment`;
 
+    logsCard.classList.add("show");
+
+    logs.innerHTML = "";
+
+    try{
+
+        const response =
+            await fetch(
+                "/api/deploy",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":
+                            "application/json"
+                    },
+                    body:JSON.stringify({
+                        repo:
+                            currentAnalysis.repository.url,
+                        env
+                    })
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if(!response.ok || !data.success){
+
+            throw new Error(
+                data.error ||
+                "Deployment failed."
+            );
+        }
+
+        currentDeployment =
+            data.deploymentId;
+
+        appendLog(
+            "[Mini Heroku] Deployment queued..."
+        );
+
+        connectLogs(
+            currentDeployment
+        );
+
+    }catch(error){
+
+        appendLog(
+            "[ERROR] " +
+            error.message,
+            true
+        );
+
+        deployBtn.disabled = false;
+        deployBtn.textContent =
+            "🚀 Deploy to Heroku";
+    }
+}
+
+
+/* =========================
+   LIVE LOGS
+========================= */
+
+function connectLogs(
+    deploymentId
+){
+
+    const source =
+        new EventSource(
+            `/api/deploy/${encodeURIComponent(
+                deploymentId
+            )}/logs`
+        );
+
+    source.onmessage =
+        event => {
+
+            try{
 
                 const data =
-                    await response.json();
+                    JSON.parse(
+                        event.data
+                    );
 
+                if(data.type === "log"){
 
-                if (!response.ok) {
-
-                    throw new Error(
-                        data.error ||
-                        "Deployment failed."
+                    appendLog(
+                        data.data
                     );
 
                 }
 
+                if(data.type === "complete"){
 
-                showStatus(
-                    `✅ ${data.message} App: ${data.app}`,
-                    "success"
-                );
+                    source.close();
 
+                    if(
+                        data.status ===
+                        "success"
+                    ){
 
-                document
-                    .getElementById(
-                        "deployForm"
-                    )
-                    .reset();
+                        appendLog(
+                            "\n✓ DEPLOYMENT SUCCESS",
+                            false,
+                            true
+                        );
 
+                        deployBtn.disabled =
+                            false;
 
-                loadApps();
+                        deployBtn.textContent =
+                            "🚀 Deploy Again";
 
+                        showMessage(
+                            "Deployment imekamilika successfully.",
+                            "success"
+                        );
 
-            } catch (error) {
+                        loadApps();
 
-                showStatus(
-                    "✗ DEPLOYMENT FAILED\n" +
+                    }else{
+
+                        appendLog(
+                            "\n✗ DEPLOYMENT FAILED\n" +
+                            (
+                                data.error ||
+                                "Unknown error"
+                            ),
+                            true
+                        );
+
+                        deployBtn.disabled =
+                            false;
+
+                        deployBtn.textContent =
+                            "🚀 Try Again";
+                    }
+                }
+
+            }catch(error){
+
+                appendLog(
                     error.message,
-                    "error"
+                    true
                 );
-
-            } finally {
-
-                deployButton.disabled =
-                    false;
-
-                deployButton.textContent =
-                    "🚀 Deploy Bot";
-
             }
+        };
 
+    source.onerror = () => {
+
+        if(
+            !currentDeployment
+        ){
+            source.close();
         }
-    );
+    };
+}
+
+
+/* =========================
+   LOG OUTPUT
+========================= */
+
+function appendLog(
+    text,
+    error = false,
+    success = false
+){
+
+    const line =
+        document.createElement(
+            "div"
+        );
+
+    line.className =
+        "log-line";
+
+    if(error){
+        line.classList.add(
+            "error-text"
+        );
+    }
+
+    if(success){
+        line.classList.add(
+            "success-text"
+        );
+    }
+
+    line.textContent =
+        text;
+
+    logs.appendChild(line);
+
+    logs.scrollTop =
+        logs.scrollHeight;
+}
 
 
 /* =========================
    LOAD APPS
 ========================= */
 
-async function loadApps() {
+async function loadApps(){
 
-    const container =
+    const list =
         document.getElementById(
-            "apps"
+            "appsList"
         );
 
-
-    try {
+    try{
 
         const response =
             await fetch(
                 "/api/apps"
             );
 
-
         const data =
             await response.json();
 
+        if(!data.success){
 
-        if (
-            !data.success ||
-            !data.apps.length
-        ) {
+            throw new Error(
+                data.error
+            );
+        }
 
-            container.innerHTML = `
+        if(!data.apps?.length){
+
+            list.innerHTML = `
                 <div class="empty">
-                    No apps deployed yet.
+                    No apps found in your Team.
                 </div>
             `;
 
-            document.getElementById(
-                "totalApps"
-            ).textContent = "0";
-
             return;
-
         }
 
+        list.innerHTML = "";
 
-        document.getElementById(
-            "totalApps"
-        ).textContent =
-            data.apps.length;
+        data.apps.forEach(app => {
 
+            const row =
+                document.createElement(
+                    "div"
+                );
 
-        container.innerHTML =
-            data.apps
-                .map(app => `
+            row.className =
+                "app";
 
-                    <div class="app-item">
-
-                        <div>
-
-                            <div class="app-name">
-                                ${escapeHtml(app.name)}
-                            </div>
-
-                            <div class="app-url">
-                                ${escapeHtml(
-                                    app.url || "No URL"
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="app-actions">
-
-                            <button
-                                onclick="restartApp(
-                                    '${escapeAttr(app.name)}'
-                                )">
-
-                                Restart
-
-                            </button>
-
-                            <button
-                                class="delete"
-                                onclick="deleteApp(
-                                    '${escapeAttr(app.name)}'
-                                )">
-
-                                Delete
-
-                            </button>
-
-                        </div>
-
+            row.innerHTML = `
+                <div>
+                    <div class="app-name">
+                        ${escapeHtml(app.name)}
                     </div>
 
-                `)
-                .join("");
+                    <div class="app-meta">
+                        ${escapeHtml(
+                            app.region?.name ||
+                            "Heroku"
+                        )}
+                    </div>
+                </div>
 
+                <div class="app-actions">
 
-    } catch (error) {
+                    <button
+                        class="small-btn"
+                        onclick="restartApp('${escapeAttr(app.name)}')"
+                    >
+                        Restart
+                    </button>
 
-        container.innerHTML = `
+                    <button
+                        class="small-btn delete"
+                        onclick="deleteApp('${escapeAttr(app.name)}')"
+                    >
+                        Delete
+                    </button>
+
+                </div>
+            `;
+
+            list.appendChild(row);
+        });
+
+    }catch(error){
+
+        list.innerHTML = `
             <div class="empty">
-                Failed to load apps.
+                ${escapeHtml(
+                    error.message
+                )}
             </div>
         `;
-
     }
-
 }
 
 
@@ -1346,55 +1334,47 @@ async function loadApps() {
    RESTART
 ========================= */
 
-async function restartApp(name) {
+async function restartApp(
+    name
+){
 
-    if (
+    if(
         !confirm(
             `Restart ${name}?`
         )
-    ) {
+    ){
         return;
     }
 
-
-    try {
+    try{
 
         const response =
             await fetch(
                 `/api/apps/${encodeURIComponent(name)}/restart`,
                 {
-                    method: "POST"
+                    method:"POST"
                 }
             );
-
 
         const data =
             await response.json();
 
-
-        if (!response.ok) {
-
+        if(!data.success){
             throw new Error(
                 data.error
             );
-
         }
 
-
         alert(
-            "Bot restarted successfully."
+            `${name} restarted.`
         );
 
-
-    } catch (error) {
+    }catch(error){
 
         alert(
-            "Restart failed: " +
             error.message
         );
-
     }
-
 }
 
 
@@ -1402,96 +1382,89 @@ async function restartApp(name) {
    DELETE
 ========================= */
 
-async function deleteApp(name) {
+async function deleteApp(
+    name
+){
 
-    if (
+    if(
         !confirm(
-            `Delete ${name}?`
+            `Delete ${name}? This cannot be undone.`
         )
-    ) {
+    ){
         return;
     }
 
-
-    try {
+    try{
 
         const response =
             await fetch(
                 `/api/apps/${encodeURIComponent(name)}`,
                 {
-                    method: "DELETE"
+                    method:"DELETE"
                 }
             );
-
 
         const data =
             await response.json();
 
-
-        if (!response.ok) {
-
+        if(!data.success){
             throw new Error(
                 data.error
             );
-
         }
-
 
         loadApps();
 
-
-    } catch (error) {
+    }catch(error){
 
         alert(
-            "Delete failed: " +
             error.message
         );
-
     }
-
 }
 
 
 /* =========================
-   ESCAPE
+   SECURITY HELPERS
 ========================= */
 
-function escapeHtml(value) {
+function escapeHtml(
+    value
+){
 
-    return String(value)
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
+    return String(value ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+}
 
+function escapeAttr(
+    value
+){
+
+    return String(value ?? "")
+        .replaceAll("\\","\\\\")
+        .replaceAll("'","\\'");
 }
 
 
-function escapeAttr(value) {
+/* =========================
+   ENTER KEY
+========================= */
 
-    return String(value)
-        .replace(
-            /'/g,
-            "\\'"
-        );
+repoUrl.addEventListener(
+    "keydown",
+    event => {
 
-}
+        if(
+            event.key === "Enter"
+        ){
+            analyzeRepository();
+        }
+    }
+);
 
 
 /* =========================
